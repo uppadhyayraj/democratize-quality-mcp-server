@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 // mcpServer.js - The new JSON-RPC 2.0 MCP Server entry point
 
 const { JSONRPCServer } = require("json-rpc-2.0");

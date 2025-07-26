@@ -1,25 +1,56 @@
 {
-  "name": "cdp-browser-control",
+  "name": "@cdp-browser-control/mcp-server",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "mcpServer.js",
+  "bin": {
+    "cdp-browser-control": "./cli.js",
+    "cdp-mcp": "./cli.js"
+  },
+  "files": [
+    "mcpServer.js",
+    "run-server.js",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node test-mcp.js",
     "docs:generate": "node scripts/generate-docs.js",
     "docs:watch": "nodemon scripts/generate-docs.js",
     "docs:clean": "rm -rf docs/",
     "start": "node mcpServer.js",
-    "dev": "MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js"
+    "server": "node run-server.js",
+    "server:debug": "node run-server.js --debug",
+    "server:prod": "node run-server.js --production", 
+    "dev": "MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js",
+    "mcp": "node mcpServer.js",
+    "inspector": "npx @modelcontextprotocol/inspector node mcpServer.js",
+    "prepare-publish": "node prepare-publish.js",
+    "prepublishOnly": "npm run prepare-publish"
   },
-  "keywords": [],
+  "keywords": ["mcp", "browser-automation", "api-testing", "chrome-devtools"],
   "author": "",
   "license": "ISC",
-  "description": "",
+  "description": "MCP Server for browser automation and API testing with Chrome DevTools Protocol",
+  "mcp": {
+    "server": {
+      "command": "node",
+      "args": ["mcpServer.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  },
   "dependencies": {
     "body-parser": "^2.2.0",
     "chrome-launcher": "^1.2.0",
     "chrome-remote-interface": "^0.33.3",
     "express": "^5.1.0",
-    "json-rpc-2.0": "^1.7.1"
+    "json-rpc-2.0": "^1.7.1",
+    "zod": "^4.0.10"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"

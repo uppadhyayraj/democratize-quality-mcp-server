@@ -1,53 +1,190 @@
-# MCP Browser Control Server
+# 🚀 CDP Browser Control MCP Server
 
-A powerful Model Context Protocol (MCP) server for browser automation and control. Provides AI agents with comprehensive web browser capabilities including navigation, interaction, and content extraction.
+A comprehensive **Model Context Protocol (MCP)** server that provides browser automation and API testing capabilities through Chrome DevTools Protocol.
 
-## 🚀 Features
+## 📋 Overview
 
-- **Browser Automation**: Launch, control, and manage Chrome/Chromium instances
-- **Web Interaction**: Click elements, type text, navigate pages
-- **Content Extraction**: Take screenshots, extract DOM content
-- **Session Management**: Persistent browser profiles for authenticated sessions
-- **Configuration**: Flexible environment-based configuration system
-- **Modular Architecture**: Easy to extend with new tools
-- **Feature Flags**: Enable/disable tool categories as needed
+This MCP server offers **20 powerful tools** for complete end-to-end testing:
 
-## 📦 Installation
+### 🌐 Browser Automation Tools (17)
+- **Core Navigation**: `browser_launch`, `browser_navigate`, `browser_close`
+- **Interaction**: `browser_click`, `browser_type`, `browser_mouse`, `browser_keyboard`
+- **Content Capture**: `browser_screenshot`, `browser_pdf`
+- **Advanced Features**: `browser_evaluate`, `browser_wait`, `browser_tabs`, `browser_network`, `browser_console`, `browser_dialog`, `browser_file`, `browser_dom`
+
+### 🔗 API Testing Tools (3)
+- **`api_request`**: HTTP requests with validation and session management
+- **`api_session_status`**: Query API test session status and logs
+- **`api_session_report`**: Generate comprehensive HTML test reports
+
+## �️ Installation & Setup
 
 ### Prerequisites
-- Node.js 18+
-- Chrome or Chromium browser
+- Node.js 14+ 
+- Chrome/Chromium browser
+- MCP-compatible client (Claude Desktop, VS Code, etc.)
 
-### Setup
+### Quick Start
+
+**Option 1: Use with npx (Recommended)**
 ```bash
+# Run directly without installation
+npx @cdp-browser-control/mcp-server --help
+
+# Use in Claude Desktop (see integration section below)
+```
+
+**Option 2: Global Installation**
+```bash
+# Install globally 
+npm install -g @cdp-browser-control/mcp-server
+
+# Then run anywhere
+cdp-browser-control --help
+```
+
+**Option 3: Local Development**
+```bash
+# Clone and install dependencies
 git clone <repository-url>
 cd cdp-browser-control
 npm install
+
+# Test the server
+npm test
+
+# Start the server
+npm start
 ```
 
-## 🎯 Quick Start
+## 🔌 Integration Methods
 
-### Start the Server
-```bash
-node mcpServer.js
-```
+### Method 1: Claude Desktop Integration (with npx)
 
-### Available Tools
-- `browser_launch` - Launch browser instances
-- `browser_navigate` - Navigate to web pages
-- `browser_click` - Click page elements
-- `browser_type` - Type text into inputs
-- `browser_screenshot` - Capture page screenshots
-- `browser_dom` - Extract page content
-- `browser_close` - Close browser instances
+Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
-### Basic Usage Example
 ```json
-// Launch browser
 {
-  "method": "tools/call",
-  "params": {
-    "name": "browser_launch",
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "npx",
+      "args": ["@cdp-browser-control/mcp-server"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+### Method 2: Claude Desktop Integration (global install)
+
+If you prefer to install globally first:
+
+```bash
+npm install -g @cdp-browser-control/mcp-server
+```
+
+Then configure Claude Desktop:
+
+```json
+{
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "cdp-browser-control"
+    }
+  }
+}
+```
+
+### Method 3: MCP Inspector (Development/Testing)
+
+```bash
+npx @modelcontextprotocol/inspector npx @cdp-browser-control/mcp-server
+```
+
+### Method 4: Direct Usage
+
+```bash
+# Run the server directly
+npx @cdp-browser-control/mcp-server
+
+# Or if installed globally
+cdp-browser-control
+```
+
+## 📚 Usage Examples
+
+### Browser Automation Workflow
+
+```javascript
+// 1. Launch browser
+await tools.browser_launch({ headless: false })
+
+// 2. Navigate to website  
+await tools.browser_navigate({ 
+  browserId: "browser_123", 
+  url: "https://example.com" 
+})
+
+// 3. Take screenshot
+await tools.browser_screenshot({ 
+  browserId: "browser_123", 
+  options: { fullPage: true }
+})
+```
+
+### API Testing Workflow
+
+```javascript
+// 1. API request with validation
+await tools.api_request({
+  sessionId: "test-session",
+  method: "GET", 
+  url: "https://api.example.com/users",
+  expect: { status: 200 }
+})
+
+// 2. Generate HTML report
+await tools.api_session_report({
+  sessionId: "test-session",
+  outputPath: "test_report.html"
+})
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+```bash
+NODE_ENV=production          # Production mode
+OUTPUT_DIR=./output         # Output directory
+```
+
+### Feature Flags (src/config/server.js)
+```javascript
+features: {
+  enableBrowserTools: true,   // Browser automation tools
+  enableOtherTools: true,     // API testing tools
+  enableDebugMode: false      // Debug logging
+}
+```
+
+## 🔍 Advanced Features
+
+- **Session Management**: Track API test sequences
+- **Request Chaining**: Use response data in subsequent requests  
+- **PDF Generation**: Convert pages to PDF with custom options
+- **Network Monitoring**: Track and analyze network requests
+- **File Operations**: Handle uploads and downloads
+- **Interactive Reports**: Beautiful HTML test reports
+
+## 📄 License
+
+ISC License
+
+---
+
+**Ready to automate browsers and test APIs with MCP!** 🎯
     "arguments": { "headless": true }
   }
 }

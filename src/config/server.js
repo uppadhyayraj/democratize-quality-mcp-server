@@ -14,6 +14,7 @@ module.exports = {
         enableBrowserTools: true,
         enableFileTools: false,
         enableNetworkTools: false,
+        enableOtherTools: true,
         enableDebugMode: process.env.NODE_ENV !== 'production'
     },
     
