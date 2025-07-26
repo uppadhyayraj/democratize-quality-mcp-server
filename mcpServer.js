@@ -73,10 +73,42 @@ server.addMethod("initialize", async (params) => {
 });
 
 // The `tools/list` method for tool discovery
+// Replace your tools/list method with this Draft 7 compatible version:
+
 server.addMethod("tools/list", async () => {
-    // IMPORTANT: All logging must go to stderr to avoid corrupting stdout JSON-RPC communication
     debugLog("Received 'tools/list' request.");
-    return { tools: toolDefinitions };
+    
+    // Convert all tool definitions to Claude Desktop compatible format
+    const compatibleTools = toolDefinitions.map(tool => {
+        // Ensure we use the correct property name and clean schema
+        return {
+            name: tool.name,
+            description: tool.description,
+            // Claude Desktop expects 'inputSchema', not 'input_schema'
+            inputSchema: {
+                type: "object",
+                properties: {
+                    // Add minimal properties to avoid empty schema issues
+                    ...((tool.input_schema && tool.input_schema.properties) || {}),
+                    // Fallback to ensure there's always at least one property
+                    ...(Object.keys((tool.input_schema && tool.input_schema.properties) || {}).length === 0 ? {
+                        _placeholder: { type: "string", description: "Placeholder parameter" }
+                    } : {})
+                },
+                // Only add required if it exists and is not empty
+                ...(tool.input_schema && tool.input_schema.required && tool.input_schema.required.length > 0 ? {
+                    required: tool.input_schema.required
+                } : {}),
+                // Ensure no additionalProperties or other Draft 2020-12 features
+                additionalProperties: false
+            }
+        };
+    });
+    
+    debugLog(`Returning ${compatibleTools.length} tools with compatible schemas`);
+    debugLog('First tool schema sample:', JSON.stringify(compatibleTools[0]?.inputSchema, null, 2));
+    
+    return { tools: compatibleTools };
 });
 
 // The `tools/call` method for tool invocation (note: it's tools/call, not tool/call)

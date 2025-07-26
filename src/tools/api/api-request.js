@@ -2,6 +2,44 @@ const ToolBase = require('../base/ToolBase');
 const https = require('https');
 const http = require('http');
 const { URL } = require('url');
+const { z } = require('zod');
+
+// Input schema for the API request tool
+const chainStepSchema = z.object({
+    name: z.string(),
+    method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']).optional(),
+    url: z.string(),
+    headers: z.record(z.string()).optional(),
+    data: z.any().optional(),
+    expect: z.object({
+        status: z.number().optional(),
+        contentType: z.string().optional(),
+        body: z.any().optional(),
+        bodyRegex: z.string().optional()
+    }).optional(),
+    extract: z.record(z.string()).optional() // { varName: 'field' }
+});
+
+const apiRequestInputSchema = z.object({
+    sessionId: z.string().optional(), // New: session management
+    // Single-request legacy mode
+    method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']).optional(),
+    url: z.string().optional(),
+    headers: z.record(z.string()).optional(),
+    data: z.any().optional(),
+    expect: z.object({
+        status: z.number().optional(),
+        contentType: z.string().optional(),
+        body: z.any().optional(),
+        bodyRegex: z.string().optional()
+    }).optional(),
+    // Chaining mode
+    chain: z.array(chainStepSchema).optional()
+});
+
+// --- In-memory session store ---
+const sessionStore = global.__API_SESSION_STORE__ || new Map();
+global.__API_SESSION_STORE__ = sessionStore;
 
 /**
  * API Request Tool - Perform HTTP API requests with validation and session management
@@ -12,187 +50,205 @@ class ApiRequestTool extends ToolBase {
         description: "Perform HTTP API requests with validation, session management, and request chaining capabilities for comprehensive API testing.",
         input_schema: {
             type: "object",
-            properties: {
-                sessionId: {
-                    type: "string",
-                    description: "Session ID for tracking multiple related requests"
-                },
-                method: {
-                    type: "string",
-                    enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
-                    default: "GET",
-                    description: "HTTP method for single request mode"
-                },
-                url: {
-                    type: "string",
-                    description: "URL for single request mode (required if not using chain)"
-                },
-                headers: {
-                    type: "object",
-                    additionalProperties: { type: "string" },
-                    description: "HTTP headers for single request"
-                },
-                data: {
-                    description: "Request body data (string, object, or buffer)"
-                },
-                expect: {
-                    type: "object",
-                    properties: {
-                        status: { type: "number", description: "Expected HTTP status code" },
-                        contentType: { type: "string", description: "Expected content type (partial match)" },
-                        body: { description: "Expected response body (exact or partial match)" },
-                        bodyRegex: { type: "string", description: "Regular expression to match against response body" }
-                    },
-                    description: "Validation expectations for response"
-                },
-                chain: {
-                    type: "array",
-                    items: {
-                        type: "object",
-                        properties: {
-                            name: { type: "string", description: "Step name for referencing results" },
-                            method: { type: "string", enum: ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"], default: "GET" },
-                            url: { type: "string", description: "URL with template support {{step.field}}" },
-                            headers: { type: "object", additionalProperties: { type: "string" } },
-                            data: { description: "Request body with template support" },
-                            expect: {
-                                type: "object",
-                                properties: {
-                                    status: { type: "number" },
-                                    contentType: { type: "string" },
-                                    body: {},
-                                    bodyRegex: { type: "string" }
-                                }
-                            },
-                            extract: {
-                                type: "object",
-                                additionalProperties: { type: "string" },
-                                description: "Extract fields from response: {varName: 'response.field.path'}"
-                            }
-                        },
-                        required: ["name", "url"]
-                    },
-                    description: "Array of chained requests with template support"
-                },
-                timeout: {
-                    type: "number",
-                    default: 30000,
-                    description: "Request timeout in milliseconds"
-                }
-            }
-        },
-        output_schema: {
-            type: "object",
-            properties: {
-                success: { type: "boolean", description: "Whether the request(s) completed successfully" },
-                sessionId: { type: "string", description: "Session ID for tracking" },
-                mode: { type: "string", enum: ["single", "chain"], description: "Request mode used" },
-                result: {
-                    type: "object",
-                    properties: {
-                        ok: { type: "boolean" },
-                        status: { type: "number" },
-                        contentType: { type: "string" },
-                        body: {},
-                        validation: { type: "object" },
-                        bodyValidation: { type: "object" }
-                    },
-                    description: "Single request result"
-                },
-                results: {
-                    type: "array",
-                    description: "Chain request results"
-                },
-                requestCount: { type: "number", description: "Number of requests made" },
-                executionTime: { type: "number", description: "Total execution time in milliseconds" }
-            },
-            required: ["success", "sessionId"]
+            // Keep minimal schema for ToolBase compatibility, actual validation done with Zod
+            properties: {}
         }
     };
 
     constructor() {
         super();
-        // Global session store (shared across tool instances)
-        if (!global.__API_SESSION_STORE__) {
-            global.__API_SESSION_STORE__ = new Map();
-        }
-        this.sessionStore = global.__API_SESSION_STORE__;
+        this.sessionStore = sessionStore;
     }
 
     async execute(parameters) {
-        const startTime = Date.now();
-        const {
-            sessionId = this.generateSessionId(),
-            method = "GET",
-            url,
-            headers = {},
-            data,
-            expect,
-            chain,
-            timeout = 30000
-        } = parameters;
+        // Validate input with Zod schema
+        const input = apiRequestInputSchema.parse(parameters);
 
-        // Initialize or get session
-        if (!this.sessionStore.has(sessionId)) {
-            this.sessionStore.set(sessionId, {
+        // --- Session Management ---
+        const uuid = () => {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+                return crypto.randomUUID();
+            // Simple pseudo-unique fallback: not cryptographically secure, but fine for session IDs
+            return 'session-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+        };
+        
+        const sessionId = input.sessionId || uuid();
+        if (!sessionStore.has(sessionId)) {
+            sessionStore.set(sessionId, {
                 sessionId,
                 startTime: new Date().toISOString(),
                 logs: [],
                 status: 'running'
             });
         }
+        const session = sessionStore.get(sessionId);
 
-        const session = this.sessionStore.get(sessionId);
+        // --- API CHAINING SUPPORT ---
+        function renderTemplate(str, vars) {
+            return str.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, path) => {
+                const [step, ...rest] = path.split('.');
+                let val = vars[step];
+                for (const p of rest)
+                    val = val?.[p];
+                return val !== undefined ? String(val) : '';
+            });
+        }
 
-        try {
-            let result;
+        function extractFields(obj, extract) {
+            const result = {};
+            for (const [k, path] of Object.entries(extract || {})) {
+                const parts = path.split('.');
+                let val = obj;
+                for (const p of parts)
+                    val = val?.[p];
+                result[k] = val;
+            }
+            return result;
+        }
+
+        // If 'chain' is present, execute steps sequentially
+        if (Array.isArray(input.chain)) {
+            const stepVars = {};
+            const results = [];
             
-            if (Array.isArray(chain) && chain.length > 0) {
-                // Chain mode
-                result = await this.executeChain(chain, session, timeout);
-                result.mode = 'chain';
-            } else {
-                // Single request mode
-                if (!url) {
-                    throw new Error('URL is required for single request mode');
+            for (const step of input.chain) {
+                // Render templates in url, headers, data
+                const url = renderTemplate(step.url, stepVars);
+                const headers = {};
+                for (const k in (step.headers || {}))
+                    headers[k] = renderTemplate(step.headers[k], stepVars);
+                
+                let data = step.data;
+                if (typeof data === 'string')
+                    data = renderTemplate(data, stepVars);
+
+                // Execute request using Node.js built-in modules
+                const response = await this.makeHttpRequest(
+                    step.method || 'GET',
+                    url,
+                    headers,
+                    data
+                );
+
+                const status = response.statusCode;
+                const contentType = response.headers['content-type'] || '';
+                let responseBody = response.body;
+                
+                if (contentType.includes('application/json')) {
+                    try {
+                        responseBody = JSON.parse(response.body);
+                    } catch (e) {
+                        // Keep as string if JSON parsing fails
+                    }
                 }
-                result = await this.executeSingleRequest({
-                    method, url, headers, data, expect, timeout
-                }, session);
-                result.mode = 'single';
+
+                // Validation
+                const expect = step.expect || {};
+                const validation = {
+                    status: expect.status ? status === expect.status : true,
+                    contentType: expect.contentType ? contentType.includes(expect.contentType) : true
+                };
+                
+                let bodyValidation = { matched: true, reason: 'No body expectation set.' };
+                if (expect.body !== undefined) {
+                    if (typeof responseBody === 'object' && responseBody !== null && typeof expect.body === 'object') {
+                        bodyValidation.matched = Object.entries(expect.body).every(
+                            ([k, v]) => JSON.stringify(responseBody[k]) === JSON.stringify(v)
+                        );
+                        bodyValidation.reason = bodyValidation.matched
+                            ? 'Partial/exact body match succeeded.'
+                            : 'Partial/exact body match failed.';
+                    } else if (typeof expect.body === 'string') {
+                        bodyValidation.matched = JSON.stringify(responseBody) === expect.body || responseBody === expect.body;
+                        bodyValidation.reason = bodyValidation.matched
+                            ? 'Exact string match succeeded.'
+                            : 'Exact string match failed.';
+                    } else {
+                        bodyValidation.matched = false;
+                        bodyValidation.reason = 'Body type mismatch.';
+                    }
+                }
+                if (expect.bodyRegex) {
+                    const pattern = new RegExp(expect.bodyRegex);
+                    const target = typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody);
+                    const regexMatch = pattern.test(target);
+                    bodyValidation = {
+                        matched: regexMatch,
+                        reason: regexMatch ? 'Regex match succeeded.' : 'Regex match failed.'
+                    };
+                }
+
+                // Extract variables
+                const extracted = step.extract ? extractFields(responseBody, step.extract) : {};
+                // Add extracted variables directly to stepVars for template rendering
+                Object.assign(stepVars, extracted);
+                // Also store step results for reference
+                stepVars[step.name] = { ...extracted, body: responseBody, status, contentType };
+
+                // Record step result
+                results.push({
+                    name: step.name,
+                    status,
+                    contentType,
+                    body: responseBody,
+                    validation,
+                    bodyValidation,
+                    extracted
+                });
+
+                // Log to session
+                session.logs.push({
+                    type: 'request',
+                    request: {
+                        method: step.method || 'GET',
+                        url,
+                        headers,
+                        data
+                    },
+                    response: {
+                        status,
+                        contentType,
+                        body: responseBody
+                    },
+                    validation,
+                    bodyValidation,
+                    timestamp: new Date().toISOString()
+                });
             }
 
+            // Log to session
+            session.logs.push({
+                type: 'chain',
+                steps: results,
+                timestamp: new Date().toISOString()
+            });
             session.status = 'completed';
-            session.endTime = new Date().toISOString();
-            session.executionTime = Date.now() - startTime;
-
-            return {
-                success: true,
-                sessionId,
-                ...result,
-                executionTime: Date.now() - startTime
-            };
-
-        } catch (error) {
-            session.status = 'failed';
-            session.error = error.message;
-            session.endTime = new Date().toISOString();
             
-            throw new Error(`API request failed: ${error.message}`);
+            return {
+                content: [{
+                    type: 'text',
+                    text: JSON.stringify({ sessionId, results }, null, 2)
+                }]
+            };
         }
-    }
 
-    /**
-     * Execute a single HTTP request
-     */
-    async executeSingleRequest(params, session) {
-        const { method, url, headers, data, expect, timeout } = params;
+        // --- SINGLE REQUEST MODE (legacy) ---
+        const { method, url, headers, data, expect } = input;
 
-        const response = await this.makeHttpRequest(method, url, headers, data, timeout);
-        
-        // Parse response body
-        let responseBody = response.body;
+        // Validate required parameters for single request mode
+        if (!url)
+            throw new Error('URL is required for single request mode');
+
+        const response = await this.makeHttpRequest(
+            method || 'GET',
+            url,
+            headers,
+            data
+        );
+
+        const status = response.statusCode;
         const contentType = response.headers['content-type'] || '';
+        let responseBody = response.body;
         
         if (contentType.includes('application/json')) {
             try {
@@ -202,119 +258,57 @@ class ApiRequestTool extends ToolBase {
             }
         }
 
-        // Validate response
-        const validation = this.validateResponse(response, expect);
-        const bodyValidation = this.validateResponseBody(responseBody, expect);
+        // Basic validation
+        const validation = {
+            status: expect?.status ? status === expect.status : true,
+            contentType: expect?.contentType ? contentType.includes(expect?.contentType) : true
+        };
+
+        // --- Enhanced Response Body Validation ---
+        let bodyValidation = { matched: true, reason: 'No body expectation set.' };
+        if (expect?.body !== undefined) {
+            if (typeof responseBody === 'object' && responseBody !== null && typeof expect.body === 'object') {
+                // Partial match: all keys/values in expect.body must be present in responseBody
+                bodyValidation.matched = Object.entries(expect.body).every(
+                    ([k, v]) => JSON.stringify(responseBody[k]) === JSON.stringify(v)
+                );
+                bodyValidation.reason = bodyValidation.matched
+                    ? 'Partial/exact body match succeeded.'
+                    : 'Partial/exact body match failed.';
+            } else if (typeof expect.body === 'string') {
+                bodyValidation.matched = JSON.stringify(responseBody) === expect.body || responseBody === expect.body;
+                bodyValidation.reason = bodyValidation.matched
+                    ? 'Exact string match succeeded.'
+                    : 'Exact string match failed.';
+            } else {
+                bodyValidation.matched = false;
+                bodyValidation.reason = 'Body type mismatch.';
+            }
+        }
+        if (expect?.bodyRegex) {
+            const pattern = new RegExp(expect.bodyRegex);
+            const target = typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody);
+            const regexMatch = pattern.test(target);
+            bodyValidation = {
+                matched: regexMatch,
+                reason: regexMatch ? 'Regex match succeeded.' : 'Regex match failed.'
+            };
+        }
+        // --- End Enhanced Validation ---
 
         // Log to session
-        session.logs.push({
-            type: 'single',
-            request: { method, url, headers, data },
-            response: {
-                status: response.statusCode,
-                contentType,
-                headers: response.headers,
-                body: responseBody
-            },
-            validation,
-            bodyValidation,
-            timestamp: new Date().toISOString()
-        });
-
-        const result = {
-            ok: validation.status && validation.contentType && bodyValidation.matched,
-            status: response.statusCode,
-            contentType,
-            body: responseBody,
-            validation,
-            bodyValidation
-        };
-
-        return {
-            result,
-            requestCount: 1
-        };
-    }
-
-    /**
-     * Execute a chain of HTTP requests
-     */
-    async executeChain(chain, session, timeout) {
-        const stepVars = {};
-        const results = [];
-
-        for (const step of chain) {
-            // Render templates in URL, headers, and data
-            const url = this.renderTemplate(step.url, stepVars);
-            const headers = {};
-            
-            for (const [key, value] of Object.entries(step.headers || {})) {
-                headers[key] = this.renderTemplate(value, stepVars);
-            }
-
-            let data = step.data;
-            if (typeof data === 'string') {
-                data = this.renderTemplate(data, stepVars);
-            }
-
-            // Execute request
-            const response = await this.makeHttpRequest(
-                step.method || 'GET', 
-                url, 
-                headers, 
-                data, 
-                timeout
-            );
-
-            // Parse response body
-            let responseBody = response.body;
-            const contentType = response.headers['content-type'] || '';
-            
-            if (contentType.includes('application/json')) {
-                try {
-                    responseBody = JSON.parse(response.body);
-                } catch (e) {
-                    // Keep as string if JSON parsing fails
-                }
-            }
-
-            // Validate response
-            const validation = this.validateResponse(response, step.expect);
-            const bodyValidation = this.validateResponseBody(responseBody, step.expect);
-
-            // Extract variables for next steps
-            const extracted = step.extract ? this.extractFields(responseBody, step.extract) : {};
-            
-            // Add extracted variables to stepVars
-            Object.assign(stepVars, extracted);
-            stepVars[step.name] = {
-                ...extracted,
-                body: responseBody,
-                status: response.statusCode,
-                contentType
-            };
-
-            // Record step result
-            const stepResult = {
-                name: step.name,
-                status: response.statusCode,
-                contentType,
-                body: responseBody,
-                validation,
-                bodyValidation,
-                extracted
-            };
-
-            results.push(stepResult);
-
-            // Log to session
+        if (session && session.logs) {
             session.logs.push({
-                type: 'request',
-                request: { method: step.method || 'GET', url, headers, data },
+                type: 'single',
+                request: {
+                    method: method || 'GET',
+                    url,
+                    headers,
+                    data
+                },
                 response: {
-                    status: response.statusCode,
+                    status,
                     contentType,
-                    headers: response.headers,
                     body: responseBody
                 },
                 validation,
@@ -323,16 +317,18 @@ class ApiRequestTool extends ToolBase {
             });
         }
 
-        // Log chain completion
-        session.logs.push({
-            type: 'chain',
-            steps: results,
-            timestamp: new Date().toISOString()
-        });
-
         return {
-            results,
-            requestCount: chain.length
+            content: [{
+                type: 'text',
+                text: JSON.stringify({
+                    ok: validation.status && validation.contentType && bodyValidation.matched,
+                    status,
+                    contentType,
+                    body: responseBody,
+                    validation,
+                    bodyValidation
+                }, null, 2)
+            }]
         };
     }
 
@@ -402,128 +398,6 @@ class ApiRequestTool extends ToolBase {
 
             req.end();
         });
-    }
-
-    /**
-     * Render template strings with variable substitution
-     */
-    renderTemplate(template, vars) {
-        if (typeof template !== 'string') return template;
-        
-        return template.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, path) => {
-            const parts = path.split('.');
-            let value = vars;
-            
-            for (const part of parts) {
-                value = value?.[part];
-            }
-            
-            return value !== undefined ? String(value) : '';
-        });
-    }
-
-    /**
-     * Extract fields from response using dot notation paths
-     */
-    extractFields(obj, extractMap) {
-        const result = {};
-        
-        for (const [varName, path] of Object.entries(extractMap)) {
-            const parts = path.split('.');
-            let value = obj;
-            
-            for (const part of parts) {
-                value = value?.[part];
-            }
-            
-            result[varName] = value;
-        }
-        
-        return result;
-    }
-
-    /**
-     * Validate HTTP response
-     */
-    validateResponse(response, expect = {}) {
-        return {
-            status: expect.status ? response.statusCode === expect.status : true,
-            contentType: expect.contentType 
-                ? (response.headers['content-type'] || '').includes(expect.contentType)
-                : true
-        };
-    }
-
-    /**
-     * Validate response body
-     */
-    validateResponseBody(responseBody, expect = {}) {
-        let bodyValidation = { 
-            matched: true, 
-            reason: 'No body expectation set.' 
-        };
-
-        if (expect.body !== undefined) {
-            if (typeof responseBody === 'object' && responseBody !== null && typeof expect.body === 'object') {
-                // Partial object match
-                bodyValidation.matched = Object.entries(expect.body).every(
-                    ([key, value]) => JSON.stringify(responseBody[key]) === JSON.stringify(value)
-                );
-                bodyValidation.reason = bodyValidation.matched
-                    ? 'Partial/exact body match succeeded.'
-                    : 'Partial/exact body match failed.';
-            } else if (typeof expect.body === 'string') {
-                // String match
-                bodyValidation.matched = JSON.stringify(responseBody) === expect.body || responseBody === expect.body;
-                bodyValidation.reason = bodyValidation.matched
-                    ? 'Exact string match succeeded.'
-                    : 'Exact string match failed.';
-            } else {
-                bodyValidation.matched = false;
-                bodyValidation.reason = 'Body type mismatch.';
-            }
-        }
-
-        if (expect.bodyRegex) {
-            const pattern = new RegExp(expect.bodyRegex);
-            const target = typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody);
-            const regexMatch = pattern.test(target);
-            
-            bodyValidation = {
-                matched: regexMatch,
-                reason: regexMatch ? 'Regex match succeeded.' : 'Regex match failed.'
-            };
-        }
-
-        return bodyValidation;
-    }
-
-    /**
-     * Generate unique session ID
-     */
-    generateSessionId() {
-        return `session-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    }
-
-    /**
-     * Get session information
-     */
-    getSession(sessionId) {
-        return this.sessionStore.get(sessionId);
-    }
-
-    /**
-     * List all sessions
-     */
-    listSessions() {
-        return Array.from(this.sessionStore.values());
-    }
-
-    /**
-     * Clear session data
-     */
-    clearSession(sessionId) {
-        return this.sessionStore.delete(sessionId);
     }
 }
 

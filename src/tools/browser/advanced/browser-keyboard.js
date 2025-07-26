@@ -73,7 +73,7 @@ class BrowserKeyboardTool extends ToolBase {
     async execute(parameters) {
         const { browserId, action, text, key, shortcut, target, delay = 0, modifiers = [] } = parameters;
         
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found`);
         }

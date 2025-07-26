@@ -74,12 +74,12 @@ class BrowserNavigateTool extends ToolBase {
             throw new Error("URL must include protocol (http:// or https://)");
         }
 
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found. Please launch a browser first using browser_launch.`);
         }
 
-        const client = browser.client;
+        const client = browser.cdpClient;
         
         console.error(`[BrowserNavigateTool] Performing ${action} action on browser ${browserId}`);
 

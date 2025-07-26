@@ -85,7 +85,7 @@ class BrowserDialogTool extends ToolBase {
             defaultResponse = {}
         } = parameters;
         
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found`);
         }
@@ -201,7 +201,7 @@ class BrowserDialogTool extends ToolBase {
      * Handle an active dialog
      */
     async handleDialog(browserId, accept, promptText) {
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found`);
         }

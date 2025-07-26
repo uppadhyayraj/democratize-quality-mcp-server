@@ -108,7 +108,7 @@ class BrowserScreenshotTool extends ToolBase {
             options = {} 
         } = parameters;
 
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found. Please launch a browser first using browser_launch.`);
         }

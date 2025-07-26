@@ -125,7 +125,7 @@ class BrowserFileTool extends ToolBase {
             overwrite = false
         } = parameters;
         
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found`);
         }
@@ -325,7 +325,7 @@ class BrowserFileTool extends ToolBase {
             downloadInfo = await downloadPromise;
             
             // Store download info
-            this.addDownloadToHistory(browserService.getBrowser(client.browserId)?.id || 'unknown', downloadInfo);
+            this.addDownloadToHistory(browserService.getBrowserInstance(client.browserId)?.id || 'unknown', downloadInfo);
         }
 
         return downloadInfo || { state: 'initiated' };

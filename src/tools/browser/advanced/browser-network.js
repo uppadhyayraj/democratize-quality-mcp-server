@@ -106,7 +106,7 @@ class BrowserNetworkTool extends ToolBase {
             limit = 50
         } = parameters;
         
-        const browser = browserService.getBrowser(browserId);
+        const browser = browserService.getBrowserInstance(browserId);
         if (!browser) {
             throw new Error(`Browser instance '${browserId}' not found`);
         }

@@ -43,7 +43,7 @@ class BrowserTypeTool extends ToolBase {
         console.error(`[BrowserTypeTool] Typing in browser ${browserId} on element: ${selector}`);
 
         try {
-            await browserService.typeText(browserId, selector, text);
+            await browserService.typeIntoElement(browserId, selector, text);
             console.error(`[BrowserTypeTool] Successfully typed in browser: ${browserId}`);
             return { success: true, browserId: browserId };
         } catch (error) {

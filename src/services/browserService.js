@@ -93,7 +93,7 @@ async function launchBrowser(headless, port, userDataDir) {
         await DOM.enable();
         await Network.enable();
         await Security.enable();
-        await Input.enable(); // Enable Input domain
+        //await Input.enable(); // Enable Input domain
 
         console.log(`[BrowserService] CDP client connected and domains enabled for ${browserId}.`);
 
@@ -315,6 +315,7 @@ async function shutdownAllBrowsers() {
 module.exports = {
     launchBrowser,
     navigateBrowser,
+    getBrowserInstance,
     takeScreenshot,
     getDomContent,
     clickElement,
