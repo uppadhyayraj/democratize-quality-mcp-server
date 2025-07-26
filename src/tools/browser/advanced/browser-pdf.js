@@ -286,8 +286,16 @@ class BrowserPdfTool extends ToolBase {
      * Generate default PDF filename
      */
     generateDefaultPath() {
+        const os = require('os');
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        return path.join(process.cwd(), `page-${timestamp}.pdf`);
+        
+        // Use output directory from environment or default to user home directory
+        const defaultOutputDir = process.env.HOME 
+            ? path.join(process.env.HOME, '.mcp-browser-control') 
+            : path.join(os.tmpdir(), 'mcp-browser-control');
+        const outputDir = process.env.OUTPUT_DIR || defaultOutputDir;
+        
+        return path.join(outputDir, `page-${timestamp}.pdf`);
     }
 
     /**

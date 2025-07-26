@@ -157,8 +157,13 @@ await tools.api_session_report({
 ### Environment Variables
 ```bash
 NODE_ENV=production          # Production mode
-OUTPUT_DIR=./output         # Output directory
+OUTPUT_DIR=./output         # Output directory (optional)
 ```
+
+### Output Directory Behavior
+- **VS Code/Local**: Uses `./output` in your project directory
+- **Claude Desktop**: Uses `~/.mcp-browser-control` (in your home directory)
+- **Custom**: Set `OUTPUT_DIR` environment variable to specify location
 
 ### Feature Flags (src/config/server.js)
 ```javascript
@@ -167,6 +172,30 @@ features: {
   enableOtherTools: true,     // API testing tools
   enableDebugMode: false      // Debug logging
 }
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**1. "No such file or directory: mkdir /mcp-output"**
+- This happens when Claude Desktop runs the server with restricted permissions
+- The server automatically creates `~/.mcp-browser-control` in your home directory
+- Screenshots and PDFs will be saved there instead of your project folder
+
+**2. Output files not appearing in expected location**
+- Check the actual output directory: `~/.mcp-browser-control/`
+- You can set a custom location with: `OUTPUT_DIR=/your/custom/path`
+
+**3. Server not starting in Claude Desktop**
+- Verify the npx package is published: `npx @cdp-browser-control/mcp-server --help`
+- Check Claude Desktop logs for detailed error messages
+- Try running directly in terminal first to test functionality
+
+### Debug Mode
+```bash
+# Enable debug output
+npx @cdp-browser-control/mcp-server --debug
 ```
 
 ## 🔍 Advanced Features

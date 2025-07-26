@@ -272,9 +272,13 @@ class BrowserScreenshotTool extends ToolBase {
     async saveScreenshot(base64Data, fileName) {
         const fs = require('fs').promises;
         const path = require('path');
+        const os = require('os');
         
-        // Use output directory from config or current directory
-        const outputDir = process.env.OUTPUT_DIR || './output';
+        // Use output directory from environment or default to user home directory
+        const defaultOutputDir = process.env.HOME 
+            ? path.join(process.env.HOME, '.mcp-browser-control') 
+            : path.join(os.tmpdir(), 'mcp-browser-control');
+        const outputDir = process.env.OUTPUT_DIR || defaultOutputDir;
         const filePath = path.join(outputDir, fileName);
         
         // Ensure directory exists

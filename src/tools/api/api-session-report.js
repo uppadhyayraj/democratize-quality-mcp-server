@@ -1,6 +1,7 @@
 const ToolBase = require('../base/ToolBase');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 /**
  * API Session Report Tool - Generate comprehensive HTML reports for API test sessions
@@ -77,7 +78,12 @@ class ApiSessionReportTool extends ToolBase {
             global.__API_SESSION_STORE__ = new Map();
         }
         this.sessionStore = global.__API_SESSION_STORE__;
-        this.outputDir = path.join(process.cwd(), 'output');
+        
+        // Use output directory from environment or default to user home directory
+        const defaultOutputDir = process.env.HOME 
+            ? path.join(process.env.HOME, '.mcp-browser-control') 
+            : path.join(os.tmpdir(), 'mcp-browser-control');
+        this.outputDir = process.env.OUTPUT_DIR || defaultOutputDir;
     }
 
     async execute(parameters) {

@@ -50,6 +50,21 @@ npm publish
 npx @cdp-browser-control/mcp-server --help
 ```
 
+### 🔧 **Key Fixes Implemented**
+
+**Output Directory Issue Resolved:**
+- ✅ Fixed "mkdir /mcp-output" permission error in Claude Desktop
+- ✅ Uses `~/.mcp-browser-control` for Claude Desktop  
+- ✅ Uses `./output` for VS Code/local development
+- ✅ Respects custom `OUTPUT_DIR` environment variable
+- ✅ Cross-platform compatibility (macOS, Linux, Windows)
+
+**Debug Support:**
+```bash
+npx @cdp-browser-control/mcp-server --debug
+# Shows output directory location and working directory
+```
+
 ### 🌟 **What You've Built**
 
 **20 Comprehensive Tools:**

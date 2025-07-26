@@ -8,6 +8,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 // Handle CLI arguments
 const args = process.argv.slice(2);
@@ -83,11 +84,22 @@ if (portIndex !== -1 && args[portIndex + 1]) {
 }
 
 // Ensure output directory exists
-const outputDir = env.OUTPUT_DIR || path.join(process.cwd(), 'mcp-output');
+// When run via npx/Claude, process.cwd() might be root, so use home directory or temp
+const defaultOutputDir = env.HOME 
+    ? path.join(env.HOME, '.mcp-browser-control') 
+    : path.join(os.tmpdir(), 'mcp-browser-control');
+    
+const outputDir = env.OUTPUT_DIR || defaultOutputDir;
 if (!fs.existsSync(outputDir)) {
     fs.mkdirSync(outputDir, { recursive: true });
 }
 env.OUTPUT_DIR = outputDir;
+
+// Debug output (if enabled)
+if (args.includes('--debug')) {
+    console.error(`📁 Output directory: ${outputDir}`);
+    console.error(`🏠 Working directory: ${process.cwd()}`);
+}
 
 // Start the MCP server
 const serverPath = path.join(__dirname, 'mcpServer.js');
