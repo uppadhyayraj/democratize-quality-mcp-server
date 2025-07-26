@@ -1,149 +1,27 @@
 // mcpServer.js - The new JSON-RPC 2.0 MCP Server entry point
 
 const { JSONRPCServer } = require("json-rpc-2.0");
-const browserService = require('./src/services/browserService'); // Your existing browser service
-// const path = require('path'); // Path is needed by browserService, no direct usage here
-const config = require('./src/config'); // Your existing config for OUTPUT_DIR, etc.
+const browserService = require('./src/services/browserService'); // Keep for shutdown functionality
+const { initializeTools, getToolDefinitions, executeTool } = require('./src/tools');
 
 // Initialize JSON-RPC server
 const server = new JSONRPCServer();
 
-// --- MCP Tool Definitions (JSON Schema) ---
-// These describe your functions to the LLM.
-// The 'name' must match the method name we register with the JSONRPCServer.
+// Global variable to hold tool definitions after initialization
+let toolDefinitions = [];
 
-const toolDefinitions = [
-    {
-        name: "browser_launch",
-        description: "Launches a new web browser instance. Returns a unique browserId. Use this before any other browser actions.",
-        input_schema: {
-            type: "object",
-            properties: {
-                headless: { type: "boolean", description: "Whether to launch the browser in headless mode (no UI). Defaults to true. Set to false for manual login.", default: true },
-                userDataDir: { type: "string", description: "Optional. A path (relative to the server) to a directory to store persistent user data (e.g., login sessions, cookies). Use for authenticated sessions. If not provided, a temporary profile is used." }
-            }
-        },
-        output_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The unique ID of the launched browser instance." },
-                port: { type: "number", description: "The port the browser instance is running on for remote debugging." },
-                userDataDir: { type: "string", description: "The absolute path to the user data directory used." }
-            },
-            required: ["browserId", "port"]
-        }
-    },
-    {
-        name: "browser_navigate",
-        description: "Navigates a specific browser instance to a given URL.",
-        input_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The ID of the browser instance to navigate." },
-                url: { type: "string", description: "The URL to navigate to." }
-            },
-            required: ["browserId", "url"]
-        }
-    },
-    {
-        name: "browser_click",
-        description: "Performs a click action on a web element identified by a CSS selector or XPath. The element will be scrolled into view.",
-        input_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The ID of the browser instance." },
-                locator: {
-                    type: "object",
-                    properties: {
-                        type: { type: "string", enum: ["css", "xpath"], description: "Type of selector: 'css' or 'xpath'." },
-                        value: { type: "string", description: "The CSS selector or XPath string." }
-                    },
-                    required: ["type", "value"]
-                }
-            },
-            required: ["browserId", "locator"]
-        },
-        output_schema: {
-            type: "object",
-            properties: {
-                x: { type: "number", description: "X coordinate of the click." },
-                y: { type: "number", description: "Y coordinate of the click." }
-            },
-            required: ["x", "y"]
-        }
-    },
-    {
-        name: "browser_type",
-        description: "Types text into a web element identified by a CSS selector or XPath. The element will be focused and existing text will be cleared.",
-        input_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The ID of the browser instance." },
-                locator: {
-                    type: "object",
-                    properties: {
-                        type: { type: "string", enum: ["css", "xpath"], description: "Type of selector: 'css' or 'xpath'." },
-                        value: { type: "string", description: "The CSS selector or XPath string." }
-                    },
-                    required: ["type", "value"]
-                },
-                text: { type: "string", description: "The text string to type into the element." }
-            },
-            required: ["browserId", "locator", "text"]
-        }
-    },
-    {
-        name: "browser_screenshot",
-        description: "Captures a screenshot of the current browser page. Returns base64 encoded image data. Optionally saves to disk.",
-        input_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The ID of the browser instance." },
-                fileName: { type: "string", description: "Optional. The name of the file to save the screenshot as (e.g., 'my_page.png'). Saved to the server's configured output directory. If not provided, a timestamped name is used." },
-                saveToDisk: { type: "boolean", description: "Optional. Whether to save the screenshot to disk on the server. Defaults to true. Set to false to only receive base64 data.", default: true }
-            },
-            required: ["browserId"]
-        },
-        output_schema: {
-            type: "object",
-            properties: {
-                imageData: { type: "string", description: "Base64 encoded PNG image data." },
-                format: { type: "string", description: "Image format (e.g., 'png')." },
-                fileName: { type: "string", description: "The file name if saved to disk." }
-            },
-            required: ["imageData", "format"]
-        }
-    },
-    {
-        name: "browser_dom",
-        description: "Retrieves the full HTML content (DOM) of the current browser page.",
-        input_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The ID of the browser instance." }
-            },
-            required: ["browserId"]
-        },
-        output_schema: {
-            type: "object",
-            properties: {
-                html: { type: "string", description: "The full outer HTML content of the page." }
-            },
-            required: ["html"]
-        }
-    },
-    {
-        name: "browser_close",
-        description: "Closes a specific browser instance and cleans up its resources. Always call this when done with a browser.",
-        input_schema: {
-            type: "object",
-            properties: {
-                browserId: { type: "string", description: "The ID of the browser instance to close." }
-            },
-            required: ["browserId"]
-        }
+// Initialize the tool system
+async function initializeServer() {
+    try {
+        console.error('[MCP Server] Initializing tool system...');
+        await initializeTools();
+        toolDefinitions = getToolDefinitions();
+        console.error(`[MCP Server] Tool system initialized with ${toolDefinitions.length} tools`);
+    } catch (error) {
+        console.error('[MCP Server] Failed to initialize tool system:', error.message);
+        process.exit(1);
     }
-];
+}
 
 // --- Register MCP Standard Methods ---
 
@@ -174,83 +52,23 @@ server.addMethod("tools/call", async ({ name, arguments: parameters }) => {
     console.error(`[MCP Server] Received 'tools/call' for method: ${name} with params: ${JSON.stringify(parameters)}`);
 
     try {
-        let result;
-        switch (name) {
-            case "browser_launch":
-                result = await browserService.launchBrowser(
-                    parameters.headless,
-                    parameters.port, // Port is often ignored by chrome-launcher in host-managed scenarios but included for completeness
-                    parameters.userDataDir
-                );
-                break;
-            case "browser_navigate":
-                if (!parameters.browserId || !parameters.url) {
-                    throw new Error("browserId and url are required for browser_navigate.");
-                }
-                await browserService.navigateBrowser(
-                    parameters.browserId,
-                    parameters.url
-                );
-                result = { message: `Navigated to ${parameters.url}` }; // Simple confirmation
-                break;
-            case "browser_click":
-                if (!parameters.browserId || !parameters.locator) {
-                    throw new Error("browserId and locator are required for browser_click.");
-                }
-                const coords = await browserService.clickElement(
-                    parameters.browserId,
-                    parameters.locator
-                );
-                result = { x: coords.x, y: coords.y };
-                break;
-            case "browser_type":
-                if (!parameters.browserId || !parameters.locator || typeof parameters.text !== 'string') {
-                    throw new Error("browserId, locator, and text are required for browser_type.");
-                }
-                await browserService.typeIntoElement(
-                    parameters.browserId,
-                    parameters.locator,
-                    parameters.text
-                );
-                result = { message: `Typed text into element` }; // Simple confirmation
-                break;
-            case "browser_screenshot":
-                if (!parameters.browserId) {
-                    throw new Error("browserId is required for browser_screenshot.");
-                }
-                const fileName = parameters.fileName || `screenshot_${parameters.browserId}_${Date.now()}.png`;
-                const imageData = await browserService.takeScreenshot(
-                    parameters.browserId,
-                    fileName,
-                    parameters.saveToDisk
-                );
-                result = { imageData: imageData, format: 'png', fileName: fileName };
-                break;
-            case "browser_dom":
-                if (!parameters.browserId) {
-                    throw new Error("browserId is required for browser_dom.");
-                }
-                const html = await browserService.getDomContent(parameters.browserId);
-                result = { html: html };
-                break;
-            case "browser_close":
-                if (!parameters.browserId) {
-                    throw new Error("browserId is required for browser_close.");
-                }
-                await browserService.closeBrowser(parameters.browserId);
-                result = { message: `Browser ${parameters.browserId} closed` };
-                break;
-            default:
-                throw new Error(`Method '${name}' not found.`);
-        }
-        return { content: [{ type: "text", text: JSON.stringify(result) }] };
+        // Use the new tool system to execute the tool
+        const result = await executeTool(name, parameters);
+        return result;
+        
     } catch (error) {
         console.error(`[MCP Server] Error executing tool '${name}':`, error.message);
-        // Return a JSON-RPC error response object
+        
+        // If it's already a properly formatted MCP error, re-throw it
+        if (error.code && error.message) {
+            throw error;
+        }
+        
+        // Otherwise, format it as an MCP error
         throw {
-            code: -32000, // Application-specific error code
+            code: -32000,
             message: `Tool execution failed: ${error.message}`,
-            data: { tool_name: name, original_error: error.message } // Optional data for more context
+            data: { tool_name: name, original_error: error.message }
         };
     }
 });
@@ -337,6 +155,11 @@ process.on('SIGTERM', async () => {
     process.exit(0);
 });
 
-// Initial message to indicate server is ready (to stderr)
-console.error(`[MCP Server] server started. Waiting for input on stdin.`);
-console.error(`[MCP Server] To integrate with a host, provide the command: node ${__filename}`);
+// Initialize the server and start listening
+(async () => {
+    await initializeServer();
+    
+    // Initial message to indicate server is ready (to stderr)
+    console.error(`[MCP Server] server started. Waiting for input on stdin.`);
+    console.error(`[MCP Server] To integrate with a host, provide the command: node ${__filename}`);
+})();

@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "docs:generate": "node scripts/generate-docs.js",
+    "docs:watch": "nodemon scripts/generate-docs.js",
+    "docs:clean": "rm -rf docs/",
+    "start": "node mcpServer.js",
+    "dev": "MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js"
   },
   "keywords": [],
   "author": "",
@@ -15,5 +20,8 @@
     "chrome-remote-interface": "^0.33.3",
     "express": "^5.1.0",
     "json-rpc-2.0": "^1.7.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
   }
 }
