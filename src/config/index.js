@@ -6,10 +6,14 @@ const fs = require('fs');
  * Loads and manages configuration from multiple sources with environment-based overrides
  */
 class ConfigManager {
-    constructor() {
+    constructor(options = {}) {
         this.config = {};
         this.environment = process.env.NODE_ENV || 'development';
         this.configDir = path.join(__dirname);
+        
+        // Check for debug mode early
+        const debugFromEnv = process.env.MCP_FEATURES_ENABLEDEBUGMODE === 'true' || this.environment === 'development';
+        this.quiet = options.quiet !== undefined ? options.quiet : !debugFromEnv;
         
         this.loadConfiguration();
     }
@@ -21,7 +25,9 @@ class ConfigManager {
      * 3. Default configuration files (lowest precedence)
      */
     loadConfiguration() {
-        console.error('[Config] Loading configuration...');
+        if (!this.quiet) {
+            console.error('[Config] Loading configuration...');
+        }
         
         try {
             // Load base server configuration
@@ -36,7 +42,9 @@ class ConfigManager {
             // Apply environment variable overrides (highest precedence)
             this.applyEnvironmentVariables();
             
-            console.error(`[Config] Configuration loaded for environment: ${this.environment}`);
+            if (!this.quiet) {
+                console.error(`[Config] Configuration loaded for environment: ${this.environment}`);
+            }
             
         } catch (error) {
             console.error('[Config] Error loading configuration:', error.message);
@@ -297,6 +305,14 @@ class ConfigManager {
         }
         
         return toolConfig;
+    }
+
+    /**
+     * Set quiet mode for logging
+     * @param {boolean} quiet - Whether to suppress non-essential logs
+     */
+    setQuiet(quiet) {
+        this.quiet = quiet;
     }
 
     /**

@@ -21,24 +21,32 @@
     "docs:generate": "node scripts/generate-docs.js",
     "docs:watch": "nodemon scripts/generate-docs.js",
     "docs:clean": "rm -rf docs/",
-    "start": "node mcpServer.js",
+    "start": "NODE_ENV=production node mcpServer.js",
+    "mcp": "NODE_ENV=production node mcpServer.js",
+    "mcp:debug": "MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js",
+    "dev": "MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js",
     "server": "node run-server.js",
     "server:debug": "node run-server.js --debug",
-    "server:prod": "node run-server.js --production", 
-    "dev": "MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js",
-    "mcp": "node mcpServer.js",
+    "server:prod": "node run-server.js --production",
     "inspector": "npx @modelcontextprotocol/inspector node mcpServer.js",
     "prepare-publish": "node prepare-publish.js",
     "prepublishOnly": "npm run prepare-publish"
   },
-  "keywords": ["mcp", "browser-automation", "api-testing", "chrome-devtools"],
+  "keywords": [
+    "mcp",
+    "browser-automation",
+    "api-testing",
+    "chrome-devtools"
+  ],
   "author": "",
   "license": "ISC",
   "description": "MCP Server for browser automation and API testing with Chrome DevTools Protocol",
   "mcp": {
     "server": {
       "command": "node",
-      "args": ["mcpServer.js"],
+      "args": [
+        "mcpServer.js"
+      ],
       "env": {
         "NODE_ENV": "production"
       }

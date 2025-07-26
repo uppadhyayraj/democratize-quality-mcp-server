@@ -193,10 +193,27 @@ features: {
 - Try running directly in terminal first to test functionality
 
 ### Debug Mode
+
+The server supports different logging modes for various use cases:
+
 ```bash
-# Enable debug output
+# Production mode (minimal logging) - Default for Claude Desktop
+npm start
+# or
+NODE_ENV=production node mcpServer.js
+
+# Debug mode (detailed logging) - For development and troubleshooting
+npm run dev
+# or  
+MCP_FEATURES_ENABLEDEBUGMODE=true node mcpServer.js
+
+# Enable debug output with CLI tool
 npx @cdp-browser-control/mcp-server --debug
 ```
+
+**Logging Levels:**
+- **Production Mode**: Shows only essential startup messages and errors
+- **Debug Mode**: Shows detailed request/response logs, tool registration, and configuration loading
 
 ## 🔍 Advanced Features
 

@@ -11,23 +11,28 @@ const toolRegistry = new ToolRegistry();
 
 /**
  * Initialize the tool registry by discovering and loading all tools
+ * @param {boolean} debugMode - Whether to enable debug logging
  * @returns {Promise<ToolRegistry>} - The initialized tool registry
  */
-async function initializeTools() {
-    console.error('[Tools] Initializing tool system...');
+async function initializeTools(debugMode = false) {
+    if (debugMode) {
+        console.error('[Tools] Initializing tool system...');
+    }
     
     try {
         // Get the tools directory path
         const toolsDir = path.join(__dirname);
         
         // Discover and load all tools
-        await toolRegistry.discoverTools(toolsDir);
+        await toolRegistry.discoverTools(toolsDir, debugMode);
         
         // Log registry statistics
         const stats = toolRegistry.getStats();
         console.error(`[Tools] Tool system initialized successfully:`);
         console.error(`[Tools] - Total tools: ${stats.total_tools}`);
-        console.error(`[Tools] - Available tools: ${stats.tool_names.join(', ')}`);
+        if (debugMode) {
+            console.error(`[Tools] - Available tools: ${stats.tool_names.join(', ')}`);
+        }
         
         return toolRegistry;
         

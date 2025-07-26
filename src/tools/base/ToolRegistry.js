@@ -15,13 +15,19 @@ class ToolRegistry {
     /**
      * Automatically discovers and loads tools from the tools directory
      * @param {string} toolsDir - The root tools directory path
+     * @param {boolean} debugMode - Whether to enable debug logging
      */
-    async discoverTools(toolsDir) {
-        console.error('[ToolRegistry] Starting tool discovery...');
+    async discoverTools(toolsDir, debugMode = false) {
+        this.debugMode = debugMode;
+        if (debugMode) {
+            console.error('[ToolRegistry] Starting tool discovery...');
+        }
         
         try {
             await this._scanDirectory(toolsDir);
-            console.error(`[ToolRegistry] Discovery complete. Found ${this.tools.size} tools.`);
+            if (debugMode) {
+                console.error(`[ToolRegistry] Discovery complete. Found ${this.tools.size} tools.`);
+            }
         } catch (error) {
             console.error('[ToolRegistry] Error during tool discovery:', error.message);
             throw error;
@@ -97,7 +103,9 @@ class ToolRegistry {
             this.tools.set(toolName, toolInstance);
             this.definitions.push(ToolClass.getDefinition());
             
-            console.error(`[ToolRegistry] Registered tool: ${toolName}`);
+            if (this.debugMode) {
+                console.error(`[ToolRegistry] Registered tool: ${toolName}`);
+            }
             
         } catch (error) {
             console.error(`[ToolRegistry] Failed to load tool from ${toolPath}:`, error.message);

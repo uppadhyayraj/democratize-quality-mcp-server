@@ -1,25 +1,54 @@
 #!/usr/bin/env node
 // mcpServer.js - The new JSON-RPC 2.0 MCP Server entry point
+//
+// Debug/Logging Modes:
+// - Production mode (default): NODE_ENV=production or npm start - Minimal logging
+// - Debug mode: MCP_FEATURES_ENABLEDEBUGMODE=true or npm run dev - Detailed logging
+// - Development mode: NODE_ENV=development - Detailed logging (same as debug)
+//
+// The server automatically detects the mode and adjusts logging verbosity accordingly.
 
 const { JSONRPCServer } = require("json-rpc-2.0");
 const browserService = require('./src/services/browserService'); // Keep for shutdown functionality
 const { initializeTools, getToolDefinitions, executeTool } = require('./src/tools');
+const config = require('./src/config');
 
 // Initialize JSON-RPC server
 const server = new JSONRPCServer();
 
+// Check if debug mode is requested via environment variable first
+const debugFromEnv = process.env.MCP_FEATURES_ENABLEDEBUGMODE === 'true' || process.env.NODE_ENV === 'development';
+const isDebugMode = config.get('features.enableDebugMode', false) || debugFromEnv;
+
+// Set quiet mode if not in debug
+config.setQuiet(!isDebugMode);
+
 // Global variable to hold tool definitions after initialization
 let toolDefinitions = [];
+
+// Helper function for debug logging
+function debugLog(...args) {
+    if (isDebugMode) {
+        console.error('[MCP Server]', ...args);
+    }
+}
+
+// Helper function for important logs (always shown)
+function log(...args) {
+    console.error('[MCP Server]', ...args);
+}
 
 // Initialize the tool system
 async function initializeServer() {
     try {
-        console.error('[MCP Server] Initializing tool system...');
-        await initializeTools();
+        if (isDebugMode) {
+            log('Initializing tool system...');
+        }
+        await initializeTools(isDebugMode);
         toolDefinitions = getToolDefinitions();
-        console.error(`[MCP Server] Tool system initialized with ${toolDefinitions.length} tools`);
+        log(`Tool system initialized with ${toolDefinitions.length} tools`);
     } catch (error) {
-        console.error('[MCP Server] Failed to initialize tool system:', error.message);
+        log('Failed to initialize tool system:', error.message);
         process.exit(1);
     }
 }
@@ -28,11 +57,13 @@ async function initializeServer() {
 
 // Initialize method for MCP protocol
 server.addMethod("initialize", async (params) => {
-    console.error("[MCP Server] Received 'initialize' request.");
+    debugLog("Received 'initialize' request.");
     return {
         protocolVersion: "2024-11-05",
         capabilities: {
-            tools: {}
+            tools: {},
+            prompts: {},
+            resources: {}
         },
         serverInfo: {
             name: "browser-control-server",
@@ -44,13 +75,13 @@ server.addMethod("initialize", async (params) => {
 // The `tools/list` method for tool discovery
 server.addMethod("tools/list", async () => {
     // IMPORTANT: All logging must go to stderr to avoid corrupting stdout JSON-RPC communication
-    console.error("[MCP Server] Received 'tools/list' request.");
+    debugLog("Received 'tools/list' request.");
     return { tools: toolDefinitions };
 });
 
 // The `tools/call` method for tool invocation (note: it's tools/call, not tool/call)
 server.addMethod("tools/call", async ({ name, arguments: parameters }) => {
-    console.error(`[MCP Server] Received 'tools/call' for method: ${name} with params: ${JSON.stringify(parameters)}`);
+    debugLog(`Received 'tools/call' for method: ${name} with params: ${JSON.stringify(parameters)}`);
 
     try {
         // Use the new tool system to execute the tool
@@ -58,7 +89,7 @@ server.addMethod("tools/call", async ({ name, arguments: parameters }) => {
         return result;
         
     } catch (error) {
-        console.error(`[MCP Server] Error executing tool '${name}':`, error.message);
+        log(`Error executing tool '${name}':`, error.message);
         
         // If it's already a properly formatted MCP error, re-throw it
         if (error.code && error.message) {
@@ -74,9 +105,34 @@ server.addMethod("tools/call", async ({ name, arguments: parameters }) => {
     }
 });
 
+// The `prompts/list` method for prompt discovery
+server.addMethod("prompts/list", async () => {
+    debugLog("Received 'prompts/list' request.");
+    // This server doesn't provide any prompts, so return an empty array
+    return { prompts: [] };
+});
+
+// The `resources/list` method for resource discovery
+server.addMethod("resources/list", async () => {
+    debugLog("Received 'resources/list' request.");
+    // This server doesn't provide any resources, so return an empty array
+    return { resources: [] };
+});
+
+// Notification methods (these don't return responses)
+server.addMethod("notifications/initialized", async () => {
+    debugLog("Received 'notifications/initialized' notification.");
+    // Notifications don't return responses
+});
+
+server.addMethod("notifications/cancelled", async ({ requestId, reason }) => {
+    debugLog(`Received 'notifications/cancelled' for request ${requestId}: ${reason}`);
+    // Notifications don't return responses
+});
+
 // Add a catch-all method handler for debugging
 server.addMethod("*", async (params, method) => {
-    console.error(`[MCP Server] Unknown method called: ${method}`);
+    debugLog(`Unknown method called: ${method}`);
     throw {
         code: -32601,
         message: `Method '${method}' not found`
@@ -102,20 +158,43 @@ process.stdin.on('data', (chunk) => {
         if (messageString) { // Ensure it's not an empty line
             try {
                 const jsonRpcRequest = JSON.parse(messageString);
-                console.error(`[MCP Server] Received request: ${JSON.stringify(jsonRpcRequest)}`);
+                debugLog(`Received request: ${JSON.stringify(jsonRpcRequest)}`);
+                
+                // Handle notifications (no response expected)
+                if (!jsonRpcRequest.id && jsonRpcRequest.method && jsonRpcRequest.method.startsWith('notifications/')) {
+                    server.receive(jsonRpcRequest).catch(err => {
+                        log("Error processing notification:", err.message);
+                    });
+                    return; // Don't send a response for notifications
+                }
+                
                 // The receive method handles processing the request and generating a response
                 server.receive(jsonRpcRequest).then((jsonRpcResponse) => {
                     if (jsonRpcResponse) {
-                        console.error(`[MCP Server] Sending response: ${JSON.stringify(jsonRpcResponse)}`);
+                        debugLog(`Sending response: ${JSON.stringify(jsonRpcResponse)}`);
                         // All responses must go to stdout
                         process.stdout.write(JSON.stringify(jsonRpcResponse) + '\n');
                     }
                 }).catch(err => {
                     // Catch errors from receive() if it rejects (e.g., malformed JSON-RPC request)
-                    console.error("[MCP Server] Error processing JSON-RPC request:", err.message);
+                    log("Error processing JSON-RPC request:", err.message);
+                    
+                    // Send an error response if we have an ID
+                    if (jsonRpcRequest.id) {
+                        const errorResponse = {
+                            jsonrpc: "2.0",
+                            error: {
+                                code: -32603,
+                                message: "Internal error",
+                                data: err.message
+                            },
+                            id: jsonRpcRequest.id
+                        };
+                        process.stdout.write(JSON.stringify(errorResponse) + '\n');
+                    }
                 });
             } catch (parseError) {
-                console.error("[MCP Server] JSON parse error on input:", messageString, parseError);
+                log("JSON parse error on input:", messageString, parseError);
                 // If the input itself is not valid JSON, we can't get an ID, so ID is null
                 const errorResponse = {
                     jsonrpc: "2.0",
@@ -133,24 +212,24 @@ process.stdin.on('data', (chunk) => {
 
 // Handle graceful shutdown signals (Ctrl+C, termination)
 process.on('SIGINT', async () => {
-    console.error('\n[MCP Server] SIGINT received. Shutting down...');
+    log('\nSIGINT received. Shutting down...');
     try {
         await browserService.shutdownAllBrowsers();
-        console.error('[MCP Server] All browser instances closed. Exiting gracefully.');
+        log('All browser instances closed. Exiting gracefully.');
     } catch (err) {
-        console.error('[MCP Server] Error during graceful shutdown:', err.message);
+        log('Error during graceful shutdown:', err.message);
         process.exit(1); // Exit with error code
     }
     process.exit(0); // Exit successfully
 });
 
 process.on('SIGTERM', async () => {
-    console.error('\n[MCP Server] SIGTERM received. Shutting down...');
+    log('\nSIGTERM received. Shutting down...');
     try {
         await browserService.shutdownAllBrowsers();
-        console.error('[MCP Server] All browser instances closed. Exiting gracefully.');
+        log('All browser instances closed. Exiting gracefully.');
     } catch (err) {
-        console.error('[MCP Server] Error during graceful shutdown:', err.message);
+        log('Error during graceful shutdown:', err.message);
         process.exit(1);
     }
     process.exit(0);
@@ -161,6 +240,9 @@ process.on('SIGTERM', async () => {
     await initializeServer();
     
     // Initial message to indicate server is ready (to stderr)
-    console.error(`[MCP Server] server started. Waiting for input on stdin.`);
-    console.error(`[MCP Server] To integrate with a host, provide the command: node ${__filename}`);
+    log(`Server started. Waiting for input on stdin.`);
+    if (isDebugMode) {
+        log(`To integrate with a host, provide the command: node ${__filename}`);
+        log(`Debug mode enabled - showing detailed logs`);
+    }
 })();
