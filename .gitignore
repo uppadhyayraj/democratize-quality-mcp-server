@@ -1,0 +1,6 @@
+*.png
+*.html
+node_modules/
+dist/
+coverage/
+my_test_profile/
