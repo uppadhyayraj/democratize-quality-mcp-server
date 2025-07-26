@@ -10,7 +10,9 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "body-parser": "^2.2.0",
     "chrome-launcher": "^1.2.0",
-    "chrome-remote-interface": "^0.33.3"
+    "chrome-remote-interface": "^0.33.3",
+    "express": "^5.1.0"
   }
 }
