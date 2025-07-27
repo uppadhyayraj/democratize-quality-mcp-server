@@ -77,6 +77,8 @@ Add to your Claude Desktop configuration (`~/Library/Application Support/Claude/
 }
 ```
 
+> **Note:** By default, the server runs in `api-only` mode, which enables only API testing tools for security and performance. To enable browser automation, use `NODE_ENV=development` or specific feature flags.
+
 ### Method 2: Claude Desktop Integration (global install)
 
 If you prefer to install globally first:
@@ -154,23 +156,167 @@ await tools.api_session_report({
 
 ## ⚙️ Configuration
 
-### Environment Variables
+### Tool Categories
+
+The server supports granular control over which tools are available. By default, **API tools are enabled in api-only mode** for lightweight, secure deployments focused on API testing.
+
+#### Available Tool Categories:
+- **🔗 API Tools** (`enableApiTools`): API testing, session management, and report generation
+- **🌐 Browser Tools** (`enableBrowserTools`): Core browser automation (launch, navigate, click, etc.)
+- **⚡ Advanced Tools** (`enableAdvancedTools`): Advanced browser features (console, network, PDF, etc.)
+- **📁 File Tools** (`enableFileTools`): File system operations (disabled by default for security)
+- **🌐 Network Tools** (`enableNetworkTools`): Network-related operations (disabled by default for security)
+- **🔧 Other Tools** (`enableOtherTools`): Miscellaneous utilities
+
+### Quick Start Configurations
+
+#### 🔗 API-Only Mode (Recommended for API Testing)
 ```bash
-NODE_ENV=production          # Production mode
-OUTPUT_DIR=./output         # Output directory (optional)
+# Command line
+npx @cdp-browser-control/mcp-server --api-only
+
+# Environment variable
+NODE_ENV=api-only
+
+# Claude Desktop config
+{
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "npx",
+      "args": ["@cdp-browser-control/mcp-server", "--api-only"]
+    }
+  }
+}
+```
+
+#### 🌐 Browser-Only Mode
+```bash
+# Command line
+npx @cdp-browser-control/mcp-server --browser-only
+
+# Environment variables
+MCP_FEATURES_ENABLEAPITOOLS=false
+MCP_FEATURES_ENABLEBROWSERTOOLS=true
+MCP_FEATURES_ENABLEADVANCEDTOOLS=true
+```
+
+#### 🚀 Enable All Tools
+```bash
+# Command line
+npx @cdp-browser-control/mcp-server --enable-all
+
+# Environment variable
+NODE_ENV=development
+```
+
+### Environment Variables
+
+#### Core Settings
+```bash
+NODE_ENV=production                           # Environment (api-only|development|production) - default: api-only
+OUTPUT_DIR=./output                          # Output directory (optional)
+MCP_FEATURES_ENABLEDEBUGMODE=true            # Enable debug logging
+```
+
+#### Tool Category Control
+```bash
+MCP_FEATURES_ENABLEAPITOOLS=true             # API testing tools (default: true)
+MCP_FEATURES_ENABLEBROWSERTOOLS=false        # Browser automation tools (default: false in api-only)
+MCP_FEATURES_ENABLEADVANCEDTOOLS=false       # Advanced browser tools (default: false)
+MCP_FEATURES_ENABLEFILETOOLS=false           # File system tools (default: false)
+MCP_FEATURES_ENABLENETWORKTOOLS=false        # Network tools (default: false)
+MCP_FEATURES_ENABLEOTHERTOOLS=false          # Other utilities (default: false)
+```
+
+### Command Line Options
+```bash
+npx @cdp-browser-control/mcp-server [options]
+
+Options:
+  --help, -h                Show help
+  --version, -v             Show version
+  --debug                   Enable debug mode
+  --port <number>           Set server port
+  --env <environment>       Set environment (development|production|api-only)
+  
+Tool Category Options:
+  --api-only                Enable only API tools
+  --browser-only            Enable only browser tools  
+  --no-api                  Disable API tools
+  --no-browser              Disable browser tools
+  --no-advanced             Disable advanced browser tools
+  --enable-all              Enable all tool categories
+```
+
+### Configuration Examples
+
+#### Claude Desktop - API Testing Only
+```json
+{
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "npx",
+      "args": ["@cdp-browser-control/mcp-server", "--api-only"],
+      "env": {
+        "OUTPUT_DIR": "~/api-test-reports"
+      }
+    }
+  }
+}
+```
+
+#### Claude Desktop - Full Browser Automation
+```json
+{
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "npx", 
+      "args": ["@cdp-browser-control/mcp-server", "--enable-all"],
+      "env": {
+        "NODE_ENV": "development",
+        "MCP_FEATURES_ENABLEDEBUGMODE": "true"
+      }
+    }
+  }
+}
+```
+
+#### Production Environment - API + Core Browser Tools
+```json
+{
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "npx",
+      "args": ["@cdp-browser-control/mcp-server"],
+      "env": {
+        "NODE_ENV": "production",
+        "MCP_FEATURES_ENABLEAPITOOLS": "true",
+        "MCP_FEATURES_ENABLEBROWSERTOOLS": "true",
+        "MCP_FEATURES_ENABLEADVANCEDTOOLS": "false"
+      }
+    }
+  }
+}
 ```
 
 ### Output Directory Behavior
 - **VS Code/Local**: Uses `./output` in your project directory
-- **Claude Desktop**: Uses `~/.mcp-browser-control` (in your home directory)
+- **Claude Desktop**: Uses `~/.mcp-browser-control` (in your home directory)  
 - **Custom**: Set `OUTPUT_DIR` environment variable to specify location
 
-### Feature Flags (src/config/server.js)
+### Feature Flags (Advanced Configuration)
+For custom deployments, you can modify the configuration files:
+
 ```javascript
+// src/config/environments/production.js
 features: {
-  enableBrowserTools: true,   // Browser automation tools
-  enableOtherTools: true,     // API testing tools
-  enableDebugMode: false      // Debug logging
+  enableApiTools: true,        // API testing tools
+  enableBrowserTools: true,    // Browser automation tools  
+  enableAdvancedTools: false,  // Advanced browser features
+  enableFileTools: false,      // File operations (security)
+  enableNetworkTools: false,   // Network operations (security)
+  enableOtherTools: false,     // Other utilities
+  enableDebugMode: false       // Debug logging
 }
 ```
 
@@ -327,7 +473,49 @@ npm test
 npm run test:coverage
 ```
 
-## 📄 License
+## � Security Considerations
+
+### Default Security Posture
+- **File Tools**: Disabled by default to prevent unauthorized file system access
+- **Network Tools**: Disabled by default to prevent network-based attacks
+- **Advanced Tools**: Disabled by default for conservative security posture
+- **API Tools**: Enabled by default as they're generally safer for testing
+
+### Production Deployment Recommendations
+```json
+{
+  "mcpServers": {
+    "cdp-browser-control": {
+      "command": "npx",
+      "args": ["@cdp-browser-control/mcp-server"],
+      "env": {
+        "NODE_ENV": "production",
+        "MCP_FEATURES_ENABLEAPITOOLS": "true",
+        "MCP_FEATURES_ENABLEBROWSERTOOLS": "true",
+        "MCP_FEATURES_ENABLEADVANCEDTOOLS": "false",
+        "MCP_FEATURES_ENABLEFILETOOLS": "false",
+        "MCP_FEATURES_ENABLENETWORKTOOLS": "false"
+      }
+    }
+  }
+}
+```
+
+### Tool Category Security Levels
+- **🟢 Low Risk**: API Tools - HTTP requests with validation
+- **🟡 Medium Risk**: Browser Tools - Automated browsing with sandboxed browser
+- **🟡 Medium Risk**: Advanced Tools - Extended browser capabilities
+- **🔴 High Risk**: File Tools - Direct file system access
+- **🔴 High Risk**: Network Tools - Raw network operations
+
+### Best Practices
+1. **Principle of Least Privilege**: Only enable tool categories you need
+2. **Environment Separation**: Use different configurations for development vs production
+3. **Output Directory**: Ensure output directories have appropriate permissions
+4. **Regular Updates**: Keep the package updated for security patches
+5. **Monitoring**: Enable debug mode during initial deployment to monitor tool usage
+
+## �📄 License
 
 [License Type] - see [LICENSE](LICENSE) file for details
 

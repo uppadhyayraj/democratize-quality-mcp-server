@@ -4,7 +4,14 @@
  */
 module.exports = {
     features: {
-        enableDebugMode: true
+        enableDebugMode: true,
+        // Tool category feature flags - all enabled by default in development
+        enableApiTools: true,
+        enableBrowserTools: true,
+        enableAdvancedTools: true,
+        enableFileTools: true,
+        enableNetworkTools: true,
+        enableOtherTools: true
     },
     
     logging: {

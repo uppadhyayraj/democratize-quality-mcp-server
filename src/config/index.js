@@ -8,7 +8,7 @@ const fs = require('fs');
 class ConfigManager {
     constructor(options = {}) {
         this.config = {};
-        this.environment = process.env.NODE_ENV || 'development';
+        this.environment = process.env.NODE_ENV || 'api-only';
         this.configDir = path.join(__dirname);
         
         // Check for debug mode early
@@ -148,10 +148,13 @@ class ConfigManager {
      * @returns {string} - CamelCase string
      */
     toCamelCase(str) {
-        // Handle special case for enablebrowsertools -> enableBrowserTools
+        // Handle special cases for tool feature flags
+        if (str === 'enableapitools') return 'enableApiTools';
         if (str === 'enablebrowsertools') return 'enableBrowserTools';
+        if (str === 'enableadvancedtools') return 'enableAdvancedTools';
         if (str === 'enablefiletools') return 'enableFileTools';
         if (str === 'enablenetworktools') return 'enableNetworkTools';
+        if (str === 'enableothertools') return 'enableOtherTools';
         if (str === 'enabledebugmode') return 'enableDebugMode';
         
         // General snake_case to camelCase conversion
@@ -236,9 +239,13 @@ class ConfigManager {
                 port: process.env.PORT || 3000
             },
             features: {
+                // Tool category feature flags with sensible defaults
+                enableApiTools: true,
                 enableBrowserTools: true,
-                enableFileTools: false,
-                enableNetworkTools: false,
+                enableAdvancedTools: false, // Conservative default for advanced tools
+                enableFileTools: false,    // Security consideration
+                enableNetworkTools: false, // Security consideration
+                enableOtherTools: false,   // Conservative default
                 enableDebugMode: this.environment !== 'production'
             },
             tools: {

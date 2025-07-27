@@ -33,10 +33,25 @@ Usage:
   cdp-mcp [options]
 
 Options:
-  --help, -h        Show this help
-  --version, -v     Show version
-  --debug          Enable debug mode
-  --port <number>  Set server port
+  --help, -h                Show this help
+  --version, -v             Show version
+  --debug                   Enable debug mode
+  --port <number>           Set server port
+  --env <environment>       Set environment (development|production|api-only)
+  
+Tool Category Options:
+  --api-only                Enable only API tools (shortcut for api-only environment)
+  --browser-only            Enable only browser tools
+  --no-api                  Disable API tools
+  --no-browser              Disable browser tools
+  --no-advanced             Disable advanced browser tools
+  --enable-all              Enable all tool categories (default in development)
+
+Environment Variables:
+  MCP_FEATURES_ENABLEAPITOOLS=true/false        Enable/disable API tools
+  MCP_FEATURES_ENABLEBROWSERTOOLS=true/false    Enable/disable browser tools
+  MCP_FEATURES_ENABLEADVANCEDTOOLS=true/false   Enable/disable advanced tools
+  NODE_ENV=api-only                             Use API-only configuration
 
 Integration with Claude Desktop:
 Add this to ~/Library/Application Support/Claude/claude_desktop_config.json
@@ -77,6 +92,42 @@ if (args.includes('--debug')) {
     env.NODE_ENV = 'development';
 }
 
+// Handle environment flag
+const envIndex = args.indexOf('--env');
+if (envIndex !== -1 && args[envIndex + 1]) {
+    env.NODE_ENV = args[envIndex + 1];
+}
+
+// Handle tool category flags
+if (args.includes('--api-only')) {
+    env.NODE_ENV = 'api-only';
+} else if (args.includes('--browser-only')) {
+    env.MCP_FEATURES_ENABLEAPITOOLS = 'false';
+    env.MCP_FEATURES_ENABLEBROWSERTOOLS = 'true';
+    env.MCP_FEATURES_ENABLEADVANCEDTOOLS = 'true';
+    env.MCP_FEATURES_ENABLEFILETOOLS = 'false';
+    env.MCP_FEATURES_ENABLENETWORKTOOLS = 'false';
+    env.MCP_FEATURES_ENABLEOTHERTOOLS = 'false';
+} else if (args.includes('--enable-all')) {
+    env.MCP_FEATURES_ENABLEAPITOOLS = 'true';
+    env.MCP_FEATURES_ENABLEBROWSERTOOLS = 'true';
+    env.MCP_FEATURES_ENABLEADVANCEDTOOLS = 'true';
+    env.MCP_FEATURES_ENABLEFILETOOLS = 'true';
+    env.MCP_FEATURES_ENABLENETWORKTOOLS = 'true';
+    env.MCP_FEATURES_ENABLEOTHERTOOLS = 'true';
+}
+
+// Handle individual tool category disable flags
+if (args.includes('--no-api')) {
+    env.MCP_FEATURES_ENABLEAPITOOLS = 'false';
+}
+if (args.includes('--no-browser')) {
+    env.MCP_FEATURES_ENABLEBROWSERTOOLS = 'false';
+}
+if (args.includes('--no-advanced')) {
+    env.MCP_FEATURES_ENABLEADVANCEDTOOLS = 'false';
+}
+
 // Handle port flag
 const portIndex = args.indexOf('--port');
 if (portIndex !== -1 && args[portIndex + 1]) {
@@ -99,6 +150,11 @@ env.OUTPUT_DIR = outputDir;
 if (args.includes('--debug')) {
     console.error(`📁 Output directory: ${outputDir}`);
     console.error(`🏠 Working directory: ${process.cwd()}`);
+    console.error(`🌍 Environment: ${env.NODE_ENV || 'development'}`);
+    console.error(`🔧 Tool Categories:`);
+    console.error(`   API Tools: ${env.MCP_FEATURES_ENABLEAPITOOLS || 'default'}`);
+    console.error(`   Browser Tools: ${env.MCP_FEATURES_ENABLEBROWSERTOOLS || 'default'}`);
+    console.error(`   Advanced Tools: ${env.MCP_FEATURES_ENABLEADVANCEDTOOLS || 'default'}`);
 }
 
 // Start the MCP server

@@ -82,11 +82,13 @@ class ToolRegistry {
             const toolName = ToolClass.getName();
             
             // Check feature flags before registering
-            const category = this._getToolCategory(toolName);
+            const category = this._getToolCategory(toolName, toolPath);
             const featureFlag = `enable${category.charAt(0).toUpperCase() + category.slice(1)}Tools`;
             
             if (!this.config.isFeatureEnabled(featureFlag)) {
-                console.error(`[ToolRegistry] Tool '${toolName}' disabled by feature flag: ${featureFlag}`);
+                if (this.debugMode) {
+                    console.error(`[ToolRegistry] Tool '${toolName}' disabled by feature flag: ${featureFlag}`);
+                }
                 return;
             }
             
@@ -197,7 +199,9 @@ class ToolRegistry {
             const featureFlag = `enable${category.charAt(0).toUpperCase() + category.slice(1)}Tools`;
             
             if (!this.config.isFeatureEnabled(featureFlag)) {
-                console.error(`[ToolRegistry] Tool '${toolName}' disabled by feature flag: ${featureFlag}`);
+                if (this.debugMode) {
+                    console.error(`[ToolRegistry] Tool '${toolName}' disabled by feature flag: ${featureFlag}`);
+                }
                 toolsToRemove.push(toolName);
             }
         }
@@ -210,14 +214,26 @@ class ToolRegistry {
     }
 
     /**
-     * Get tool category from tool name
+     * Get tool category from tool name and file path
      * @param {string} toolName - The tool name
+     * @param {string} toolPath - The tool file path (optional, for better categorization)
      * @returns {string} - The tool category
      */
-    _getToolCategory(toolName) {
+    _getToolCategory(toolName, toolPath = '') {
+        // Check by tool name prefix first
+        if (toolName.startsWith('api_')) return 'api';
         if (toolName.startsWith('browser_')) return 'browser';
         if (toolName.startsWith('file_')) return 'file';
         if (toolName.startsWith('network_')) return 'network';
+        
+        // Check by file path if tool name doesn't have clear prefix
+        if (toolPath.includes('/api/') || toolPath.includes('\\api\\')) return 'api';
+        if (toolPath.includes('/browser/') || toolPath.includes('\\browser\\')) return 'browser';
+        if (toolPath.includes('/advanced/') || toolPath.includes('\\advanced\\')) return 'advanced';
+        if (toolPath.includes('/file/') || toolPath.includes('\\file\\')) return 'file';
+        if (toolPath.includes('/network/') || toolPath.includes('\\network\\')) return 'network';
+        
+        // Default fallback
         return 'other';
     }
 
@@ -238,9 +254,12 @@ class ToolRegistry {
             definitions_count: this.definitions.length,
             categories: categories,
             feature_flags: {
+                enableApiTools: this.config.isFeatureEnabled('enableApiTools'),
                 enableBrowserTools: this.config.isFeatureEnabled('enableBrowserTools'),
+                enableAdvancedTools: this.config.isFeatureEnabled('enableAdvancedTools'),
                 enableFileTools: this.config.isFeatureEnabled('enableFileTools'),
                 enableNetworkTools: this.config.isFeatureEnabled('enableNetworkTools'),
+                enableOtherTools: this.config.isFeatureEnabled('enableOtherTools'),
                 enableDebugMode: this.config.isFeatureEnabled('enableDebugMode')
             }
         };

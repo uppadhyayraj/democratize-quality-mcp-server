@@ -4,7 +4,14 @@
  */
 module.exports = {
     features: {
-        enableDebugMode: false
+        enableDebugMode: false,
+        // Tool category feature flags - API tools enabled by default, others can be controlled
+        enableApiTools: true,
+        enableBrowserTools: process.env.ENABLE_BROWSER_TOOLS !== 'false',
+        enableAdvancedTools: process.env.ENABLE_ADVANCED_TOOLS === 'true',
+        enableFileTools: process.env.ENABLE_FILE_TOOLS === 'true',
+        enableNetworkTools: process.env.ENABLE_NETWORK_TOOLS === 'true',
+        enableOtherTools: process.env.ENABLE_OTHER_TOOLS === 'true'
     },
     
     logging: {
