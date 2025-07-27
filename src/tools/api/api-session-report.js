@@ -337,6 +337,12 @@ class ApiSessionReportTool extends ToolBase {
             }));
         }
 
+        // Process validation data for single requests
+        if (log.validation || log.bodyValidation) {
+            processed.validation = log.validation || {};
+            processed.bodyValidation = log.bodyValidation || {};
+        }
+
         return processed;
     }
 
@@ -719,6 +725,23 @@ class ApiSessionReportTool extends ToolBase {
         .status-4xx { background: #fd7e14; color: white; }
         .status-5xx { background: #dc3545; color: white; }
 
+        .validation-badge {
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: bold;
+        }
+
+        .validation-badge.passed {
+            background: #28a745;
+            color: white;
+        }
+
+        .validation-badge.failed {
+            background: #dc3545;
+            color: white;
+        }
+
         .log-body {
             padding: 20px;
             background: white;
@@ -915,8 +938,11 @@ class ApiSessionReportTool extends ToolBase {
             return '';
         }
 
-        const hasValidation = log.validation && log.bodyValidation;
+        const hasValidation = (log.validation && Object.keys(log.validation).length > 0) || 
+                             (log.bodyValidation && Object.keys(log.bodyValidation).length > 0);
         const isValidationPassed = hasValidation &&
+            log.validation &&
+            log.bodyValidation &&
             log.validation.status &&
             log.validation.contentType &&
             log.bodyValidation.matched;
@@ -957,6 +983,7 @@ class ApiSessionReportTool extends ToolBase {
             <div class="log-body">
                 ${this.generateRequestResponseHtml(log)}
                 ${hasValidation ? this.generateValidationHtml(log.validation, log.bodyValidation) : ''}
+                ${!hasValidation ? '<!-- No validation data available -->' : ''}
             </div>
         </div>
         `;
@@ -1036,6 +1063,10 @@ class ApiSessionReportTool extends ToolBase {
      * Generate validation results HTML
      */
     generateValidationHtml(validation, bodyValidation) {
+        // Handle undefined or empty validation objects
+        validation = validation || {};
+        bodyValidation = bodyValidation || {};
+        
         const isPassed = validation.status && validation.contentType && bodyValidation.matched;
 
         return `
