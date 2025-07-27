@@ -78,10 +78,10 @@ class ApiSessionReportTool extends ToolBase {
             global.__API_SESSION_STORE__ = new Map();
         }
         this.sessionStore = global.__API_SESSION_STORE__;
-        
+
         // Use output directory from environment or default to user home directory
-        const defaultOutputDir = process.env.HOME 
-            ? path.join(process.env.HOME, '.mcp-browser-control') 
+        const defaultOutputDir = process.env.HOME
+            ? path.join(process.env.HOME, '.mcp-browser-control')
             : path.join(os.tmpdir(), 'mcp-browser-control');
         this.outputDir = process.env.OUTPUT_DIR || defaultOutputDir;
     }
@@ -98,7 +98,7 @@ class ApiSessionReportTool extends ToolBase {
         } = parameters;
 
         const session = this.sessionStore.get(sessionId);
-        
+
         if (!session) {
             return {
                 success: false,
@@ -115,9 +115,9 @@ class ApiSessionReportTool extends ToolBase {
 
             // Generate report data
             const reportData = this.generateReportData(
-                session, 
-                includeRequestData, 
-                includeResponseData, 
+                session,
+                includeRequestData,
+                includeResponseData,
                 includeTiming
             );
 
@@ -127,7 +127,7 @@ class ApiSessionReportTool extends ToolBase {
             // Write report to file
             const fullOutputPath = path.join(this.outputDir, outputPath);
             const outputDir = path.dirname(fullOutputPath);
-            
+
             if (!fs.existsSync(outputDir)) {
                 fs.mkdirSync(outputDir, { recursive: true });
             }
@@ -162,14 +162,14 @@ class ApiSessionReportTool extends ToolBase {
      */
     generateReportData(session, includeRequestData, includeResponseData, includeTiming) {
         const logs = session.logs || [];
-        
+
         // Generate summary
         const summary = this.generateSummary(logs);
-        
+
         // Process logs for display
         const processedLogs = logs.map(log => this.processLogForReport(
-            log, 
-            includeRequestData, 
+            log,
+            includeRequestData,
             includeResponseData
         ));
 
@@ -206,16 +206,30 @@ class ApiSessionReportTool extends ToolBase {
         let failedRequests = 0;
         let validationsPassed = 0;
         let validationsFailed = 0;
+        let chainStepCount = 0;
+        let singleRequestCount = 0;
 
-        for (const log of logs) {
-            if (log.type === 'single' || log.type === 'request') {
+        // Process chain steps and single requests separately
+        const chainSteps = logs
+            .filter(log => log.type === 'chain' && log.steps)
+            .flatMap(log => log.steps || []);
+        
+        const singleRequests = logs.filter(
+            log => (log.type === 'single' || log.type === 'request') && 
+                   log.request && log.response
+        );
+
+        // Process chain steps
+        for (const step of chainSteps) {
+            if (step.request && step.response) {
                 totalRequests++;
+                chainStepCount++;
                 
-                const isValid = log.validation && 
-                               log.bodyValidation &&
-                               log.validation.status && 
-                               log.validation.contentType && 
-                               log.bodyValidation.matched;
+                const isValid = step.validation &&
+                    step.bodyValidation &&
+                    step.validation.status &&
+                    step.validation.contentType &&
+                    step.bodyValidation.matched;
 
                 if (isValid) {
                     successfulRequests++;
@@ -224,24 +238,26 @@ class ApiSessionReportTool extends ToolBase {
                     failedRequests++;
                     validationsFailed++;
                 }
-            } else if (log.type === 'chain' && log.steps) {
-                totalRequests += log.steps.length;
-                
-                for (const step of log.steps) {
-                    const isValid = step.validation && 
-                                   step.bodyValidation &&
-                                   step.validation.status && 
-                                   step.validation.contentType && 
-                                   step.bodyValidation.matched;
+            }
+        }
 
-                    if (isValid) {
-                        successfulRequests++;
-                        validationsPassed++;
-                    } else {
-                        failedRequests++;
-                        validationsFailed++;
-                    }
-                }
+        // Process single requests
+        for (const request of singleRequests) {
+            totalRequests++;
+            singleRequestCount++;
+            
+            const isValid = request.validation &&
+                request.bodyValidation &&
+                request.validation.status &&
+                request.validation.contentType &&
+                request.bodyValidation.matched;
+
+            if (isValid) {
+                successfulRequests++;
+                validationsPassed++;
+            } else {
+                failedRequests++;
+                validationsFailed++;
             }
         }
 
@@ -252,10 +268,12 @@ class ApiSessionReportTool extends ToolBase {
             successRate: totalRequests > 0 ? Math.round((successfulRequests / totalRequests) * 100) / 100 : 0,
             validationsPassed,
             validationsFailed,
-            validationRate: (validationsPassed + validationsFailed) > 0 
-                ? Math.round((validationsPassed / (validationsPassed + validationsFailed)) * 100) / 100 
+            validationRate: (validationsPassed + validationsFailed) > 0
+                ? Math.round((validationsPassed / (validationsPassed + validationsFailed)) * 100) / 100
                 : 0,
-            logEntries: logs.length
+            logEntries: logs.length,
+            chainSteps: chainStepCount,
+            singleRequests: singleRequestCount
         };
     }
 
@@ -269,72 +287,54 @@ class ApiSessionReportTool extends ToolBase {
             formattedTime: new Date(log.timestamp).toLocaleString()
         };
 
-        // Process request data
+        // Process request data with better error handling
         if (log.request && includeRequestData) {
             processed.request = {
-                method: log.request.method,
-                url: log.request.url,
+                method: log.request.method || 'UNKNOWN',
+                url: log.request.url || 'UNKNOWN',
                 headers: log.request.headers || {},
                 data: log.request.data || null
             };
         } else if (log.request) {
             processed.request = {
-                method: log.request.method,
-                url: log.request.url,
+                method: log.request.method || 'UNKNOWN',
+                url: log.request.url || 'UNKNOWN',
                 hasHeaders: !!(log.request.headers && Object.keys(log.request.headers).length > 0),
                 hasData: !!log.request.data
             };
         }
 
-        // Process response data
+        // Process response data with better error handling
         if (log.response && includeResponseData) {
             processed.response = {
-                status: log.response.status,
-                statusText: log.response.statusText || '',
-                contentType: log.response.contentType,
+                status: log.response.status || 0,
+                statusText: log.response.statusText || 'UNKNOWN',
+                contentType: log.response.contentType || 'UNKNOWN',
                 headers: log.response.headers || {},
                 body: log.response.body || null
             };
         } else if (log.response) {
             processed.response = {
-                status: log.response.status,
-                statusText: log.response.statusText || '',
-                contentType: log.response.contentType,
+                status: log.response.status || 0,
+                statusText: log.response.statusText || 'UNKNOWN',
+                contentType: log.response.contentType || 'UNKNOWN',
                 hasHeaders: !!(log.response.headers && Object.keys(log.response.headers).length > 0),
                 bodySize: log.response.body ? log.response.body.length : 0
             };
         }
 
-        // Include validation results
-        if (log.validation) {
-            processed.validation = log.validation;
-        }
-
-        if (log.bodyValidation) {
-            processed.bodyValidation = log.bodyValidation;
-        }
-
-        // Process chain steps
+        // Process chain steps with better data handling
         if (log.steps) {
-            processed.steps = log.steps.map(step => this.processLogForReport({
-                type: 'request',
-                timestamp: log.timestamp,
-                request: {
-                    method: step.method,
-                    url: step.url,
-                    headers: step.headers,
-                    data: step.data
-                },
-                response: {
-                    status: step.status,
-                    statusText: step.statusText,
-                    contentType: step.contentType,
-                    headers: step.headers,
-                    body: step.body
-                },
-                validation: step.validation,
-                bodyValidation: step.bodyValidation
-            }, includeRequestData, includeResponseData));
+            processed.steps = log.steps.map(step => ({
+                method: step.method || 'UNKNOWN',
+                url: step.url || 'UNKNOWN',
+                status: step.status || 0,
+                timestamp: step.timestamp || log.timestamp,
+                data: step.data || null,
+                headers: step.headers || {},
+                validation: step.validation || {},
+                bodyValidation: step.bodyValidation || {}
+            }));
         }
 
         return processed;
@@ -344,35 +344,61 @@ class ApiSessionReportTool extends ToolBase {
      * Generate timing analysis data
      */
     generateTimingData(logs, session) {
-        const requests = logs.filter(log => log.type === 'single' || log.type === 'request');
+        // Process chain steps and single requests separately
+        const chainSteps = logs
+            .filter(log => log.type === 'chain' && log.steps)
+            .flatMap(log => log.steps || [])
+            .filter(step => step.timestamp && step.method && step.url && step.status);
         
-        if (requests.length === 0) {
+        const singleRequests = logs
+            .filter(log => (log.type === 'single' || log.type === 'request') && 
+                   log.request && log.response)
+            .map(req => ({
+                timestamp: req.timestamp,
+                method: req.request.method,
+                url: req.request.url,
+                status: req.response.status
+            }));
+
+        const allRequests = [...chainSteps, ...singleRequests];
+
+        if (allRequests.length === 0) {
             return null;
         }
 
-        const sessionStart = new Date(session.startTime).getTime();
-        const timings = [];
+        // Sort requests by timestamp to ensure correct timing
+        allRequests.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-        for (let i = 0; i < requests.length; i++) {
-            const requestTime = new Date(requests[i].timestamp).getTime();
+        const sessionStart = new Date(session.startTime).getTime();
+        const timings = allRequests.map((req, i) => {
+            const requestTime = new Date(req.timestamp).getTime();
             const relativeTime = requestTime - sessionStart;
-            
-            timings.push({
+
+            return {
                 index: i,
-                timestamp: requests[i].timestamp,
+                timestamp: req.timestamp,
                 relativeTimeMs: relativeTime,
-                method: requests[i].request?.method || 'UNKNOWN',
-                url: requests[i].request?.url || 'UNKNOWN',
-                status: requests[i].response?.status || 0
-            });
-        }
+                method: req.method || 'UNKNOWN',
+                url: req.url || 'UNKNOWN',
+                status: req.status || 0
+            };
+        });
+
+        // Calculate actual intervals between requests
+        const intervals = timings.map((t, i) => i === 0 ? 0 : t.relativeTimeMs - timings[i - 1].relativeTimeMs);
+        const averageInterval = intervals.length > 1 ? Math.round(intervals.reduce((a, b) => a + b) / (intervals.length - 1)) : 0;
+
+        // Calculate session duration using first and last request timestamps
+        const firstRequest = allRequests[0];
+        const lastRequest = allRequests[allRequests.length - 1];
+        const sessionDuration = lastRequest 
+            ? (new Date(lastRequest.timestamp).getTime() - new Date(firstRequest.timestamp).getTime())
+            : 0;
 
         return {
-            sessionDurationMs: session.executionTime || 0,
-            requestCount: requests.length,
-            averageIntervalMs: timings.length > 1 
-                ? Math.round((timings[timings.length - 1].relativeTimeMs) / (timings.length - 1))
-                : 0,
+            sessionDurationMs: sessionDuration,
+            requestCount: allRequests.length,
+            averageIntervalMs: averageInterval,
             timings
         };
     }
@@ -884,16 +910,21 @@ class ApiSessionReportTool extends ToolBase {
      * Generate individual log entry HTML
      */
     generateLogEntry(log, index) {
-        const isChain = log.type === 'chain';
+        // Skip chain type logs entirely
+        if (log.type === 'chain') {
+            return '';
+        }
+
         const hasValidation = log.validation && log.bodyValidation;
-        const isValidationPassed = hasValidation && 
-            log.validation.status && 
-            log.validation.contentType && 
+        const isValidationPassed = hasValidation &&
+            log.validation.status &&
+            log.validation.contentType &&
             log.bodyValidation.matched;
 
         let method = 'UNKNOWN';
         let url = 'UNKNOWN';
         let statusCode = 0;
+        let statusText = '';
 
         if (log.request) {
             method = log.request.method || 'UNKNOWN';
@@ -902,9 +933,10 @@ class ApiSessionReportTool extends ToolBase {
 
         if (log.response) {
             statusCode = log.response.status || 0;
+            statusText = log.response.statusText || '';
         }
 
-        const statusClass = `status-${Math.floor(statusCode / 100)}xx`;
+        const statusClass = statusCode > 0 ? `status-${Math.floor(statusCode / 100)}xx` : '';
 
         return `
         <div class="log-entry">
@@ -913,17 +945,17 @@ class ApiSessionReportTool extends ToolBase {
                     <span class="arrow">▶</span>
                     <span class="method method-${method.toLowerCase()}">${method}</span>
                     <span>${this.escapeHtml(url)}</span>
-                    ${statusCode > 0 ? `<span class="status-code ${statusClass}">${statusCode}</span>` : ''}
-                    ${hasValidation ? 
-                        `<span class="validation-badge ${isValidationPassed ? 'passed' : 'failed'}">
+                    ${statusCode > 0 ? `<span class="status-code ${statusClass}">${statusCode} ${statusText}</span>` : ''}
+                    ${hasValidation ?
+                `<span class="validation-badge ${isValidationPassed ? 'passed' : 'failed'}">
                             ${isValidationPassed ? '✓' : '✗'} Validation
                         </span>` : ''
-                    }
+            }
                 </div>
-                <div class="log-time">${log.formattedTime}</div>
+                <div class="log-time">${log.formattedTime || ''}</div>
             </div>
             <div class="log-body">
-                ${isChain ? this.generateChainStepsHtml(log.steps) : this.generateRequestResponseHtml(log)}
+                ${this.generateRequestResponseHtml(log)}
                 ${hasValidation ? this.generateValidationHtml(log.validation, log.bodyValidation) : ''}
             </div>
         </div>
@@ -955,13 +987,18 @@ class ApiSessionReportTool extends ToolBase {
      * Generate request/response HTML
      */
     generateRequestResponseHtml(log) {
+        // Skip if no request or response data
+        if (!log.request && !log.response) {
+            return '<p>No request/response data available</p>';
+        }
+
         return `
         <div class="request-response-grid">
             <div class="request-section">
                 <div class="section-title">Request</div>
                 ${log.request ? `
-                    <p><strong>Method:</strong> ${log.request.method}</p>
-                    <p><strong>URL:</strong> ${this.escapeHtml(log.request.url)}</p>
+                    <p><strong>Method:</strong> ${log.request.method || 'UNKNOWN'}</p>
+                    <p><strong>URL:</strong> ${this.escapeHtml(log.request.url || 'UNKNOWN')}</p>
                     ${Object.keys(log.request.headers || {}).length > 0 ? `
                         <p><strong>Headers:</strong></p>
                         <div class="code-block">${this.escapeHtml(JSON.stringify(log.request.headers, null, 2))}</div>
@@ -975,15 +1012,19 @@ class ApiSessionReportTool extends ToolBase {
             <div class="response-section">
                 <div class="section-title">Response</div>
                 ${log.response ? `
-                    <p><strong>Status:</strong> ${log.response.status} ${log.response.statusText || ''}</p>
-                    <p><strong>Content-Type:</strong> ${log.response.contentType || 'unknown'}</p>
+                    <p><strong>Status:</strong> ${log.response.status || 'UNKNOWN'} ${log.response.statusText ? `- ${log.response.statusText}` : ''}</p>
+                    ${log.response.contentType ? `<p><strong>Content Type:</strong> ${log.response.contentType}</p>` : ''}
                     ${Object.keys(log.response.headers || {}).length > 0 ? `
                         <p><strong>Headers:</strong></p>
                         <div class="code-block">${this.escapeHtml(JSON.stringify(log.response.headers, null, 2))}</div>
                     ` : ''}
-                    ${log.response.body ? `
+                    ${log.response.body !== undefined ? `
                         <p><strong>Body:</strong></p>
-                        <div class="code-block">${this.escapeHtml(typeof log.response.body === 'string' ? log.response.body : JSON.stringify(log.response.body, null, 2))}</div>
+                        <div class="code-block">${
+                            typeof log.response.body === 'string' 
+                                ? this.escapeHtml(log.response.body) 
+                                : this.escapeHtml(JSON.stringify(log.response.body, null, 2))
+                        }</div>
                     ` : ''}
                 ` : '<p>No response data available</p>'}
             </div>
@@ -996,7 +1037,7 @@ class ApiSessionReportTool extends ToolBase {
      */
     generateValidationHtml(validation, bodyValidation) {
         const isPassed = validation.status && validation.contentType && bodyValidation.matched;
-        
+
         return `
         <div class="validation-results ${isPassed ? 'validation-passed' : 'validation-failed'}">
             <h4>Validation Results</h4>
