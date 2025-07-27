@@ -308,7 +308,7 @@ class ApiSessionReportTool extends ToolBase {
         if (log.response && includeResponseData) {
             processed.response = {
                 status: log.response.status || 0,
-                statusText: log.response.statusText || 'UNKNOWN',
+                statusText: log.response.statusText || this.getStatusTextFromCode(log.response.status),
                 contentType: log.response.contentType || 'UNKNOWN',
                 headers: log.response.headers || {},
                 body: log.response.body || null
@@ -316,7 +316,7 @@ class ApiSessionReportTool extends ToolBase {
         } else if (log.response) {
             processed.response = {
                 status: log.response.status || 0,
-                statusText: log.response.statusText || 'UNKNOWN',
+                statusText: log.response.statusText || this.getStatusTextFromCode(log.response.status),
                 contentType: log.response.contentType || 'UNKNOWN',
                 hasHeaders: !!(log.response.headers && Object.keys(log.response.headers).length > 0),
                 bodySize: log.response.body ? log.response.body.length : 0
@@ -933,7 +933,7 @@ class ApiSessionReportTool extends ToolBase {
 
         if (log.response) {
             statusCode = log.response.status || 0;
-            statusText = log.response.statusText || '';
+            statusText = log.response.statusText || this.getStatusTextFromCode(statusCode);
         }
 
         const statusClass = statusCode > 0 ? `status-${Math.floor(statusCode / 100)}xx` : '';
@@ -1012,7 +1012,7 @@ class ApiSessionReportTool extends ToolBase {
             <div class="response-section">
                 <div class="section-title">Response</div>
                 ${log.response ? `
-                    <p><strong>Status:</strong> ${log.response.status || 'UNKNOWN'} ${log.response.statusText ? `- ${log.response.statusText}` : ''}</p>
+                    <p><strong>Status:</strong> ${log.response.status || 'UNKNOWN'}${log.response.statusText || this.getStatusTextFromCode(log.response.status) ? ` - ${log.response.statusText || this.getStatusTextFromCode(log.response.status)}` : ''}</p>
                     ${log.response.contentType ? `<p><strong>Content Type:</strong> ${log.response.contentType}</p>` : ''}
                     ${Object.keys(log.response.headers || {}).length > 0 ? `
                         <p><strong>Headers:</strong></p>
@@ -1047,6 +1047,35 @@ class ApiSessionReportTool extends ToolBase {
             ${bodyValidation.reason ? `<p><strong>Reason:</strong> ${this.escapeHtml(bodyValidation.reason)}</p>` : ''}
         </div>
         `;
+    }
+
+    /**
+     * Get status text from status code
+     */
+    getStatusTextFromCode(statusCode) {
+        const statusTexts = {
+            200: 'OK',
+            201: 'Created',
+            202: 'Accepted',
+            204: 'No Content',
+            300: 'Multiple Choices',
+            301: 'Moved Permanently',
+            302: 'Found',
+            304: 'Not Modified',
+            400: 'Bad Request',
+            401: 'Unauthorized',
+            403: 'Forbidden',
+            404: 'Not Found',
+            405: 'Method Not Allowed',
+            409: 'Conflict',
+            422: 'Unprocessable Entity',
+            429: 'Too Many Requests',
+            500: 'Internal Server Error',
+            502: 'Bad Gateway',
+            503: 'Service Unavailable',
+            504: 'Gateway Timeout'
+        };
+        return statusTexts[statusCode] || '';
     }
 
     /**

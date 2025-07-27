@@ -307,7 +307,7 @@ class ApiRequestTool extends ToolBase {
                     );
 
                     const status = response.statusCode;
-                    const statusText = response.status;
+                    const statusText = response.statusMessage || '';
                     const contentType = response.headers['content-type'] || '';
                     let responseBody = response.body;
 
@@ -442,7 +442,7 @@ class ApiRequestTool extends ToolBase {
             );
 
             const status = response.statusCode;
-            const statusText = response.status|| '';
+            const statusText = response.statusMessage || '';
             const contentType = response.headers['content-type'] || '';
             let responseBody = response.body;
 
