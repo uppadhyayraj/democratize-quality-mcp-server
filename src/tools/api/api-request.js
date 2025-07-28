@@ -385,6 +385,7 @@ class ApiRequestTool extends ToolBase {
                         statusText,
                         contentType,
                         body: responseBody,
+                        expectations: step.expect || {},
                         validation,
                         bodyValidation,
                         extracted
@@ -405,6 +406,7 @@ class ApiRequestTool extends ToolBase {
                             contentType,
                             body: responseBody
                         },
+                        expectations: step.expect || {},
                         validation,
                         bodyValidation,
                         timestamp: new Date().toISOString()
@@ -515,6 +517,7 @@ class ApiRequestTool extends ToolBase {
                         contentType,
                         body: responseBody
                     },
+                    expectations: expect || {},
                     validation,
                     bodyValidation,
                     timestamp: new Date().toISOString()

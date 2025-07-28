@@ -332,6 +332,7 @@ class ApiSessionReportTool extends ToolBase {
                 timestamp: step.timestamp || log.timestamp,
                 data: step.data || null,
                 headers: step.headers || {},
+                expectations: step.expectations || {},
                 validation: step.validation || {},
                 bodyValidation: step.bodyValidation || {}
             }));
@@ -341,6 +342,7 @@ class ApiSessionReportTool extends ToolBase {
         if (log.validation || log.bodyValidation) {
             processed.validation = log.validation || {};
             processed.bodyValidation = log.bodyValidation || {};
+            processed.expectations = log.expectations || {};
         }
 
         return processed;
@@ -811,6 +813,43 @@ class ApiSessionReportTool extends ToolBase {
             border-left: 4px solid #dc3545;
         }
 
+        .validation-comparison {
+            margin-top: 10px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .expected-section, .actual-section {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .theme-dark .expected-section,
+        .theme-dark .actual-section {
+            background: rgba(0, 0, 0, 0.2);
+        }
+
+        .comparison-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+
+        .comparison-value {
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            padding: 5px;
+            background: #f8f9fa;
+            border-radius: 3px;
+            word-break: break-all;
+        }
+
+        .theme-dark .comparison-value {
+            background: #2d2d2d;
+        }
+
         .timing-section {
             background: white;
             padding: 30px;
@@ -933,9 +972,26 @@ class ApiSessionReportTool extends ToolBase {
      * Generate individual log entry HTML
      */
     generateLogEntry(log, index) {
-        // Skip chain type logs entirely
+        // Handle chain type logs
         if (log.type === 'chain') {
-            return '';
+            if (!log.steps || log.steps.length === 0) {
+                return '';
+            }
+            
+            return `
+            <div class="log-entry">
+                <div class="log-header">
+                    <div class="log-title">
+                        <span class="arrow">▶</span>
+                        <span style="font-weight: bold;">Chain Request (${log.steps.length} steps)</span>
+                    </div>
+                    <div class="log-time">${log.formattedTime || ''}</div>
+                </div>
+                <div class="log-body">
+                    ${this.generateChainStepsHtml(log.steps)}
+                </div>
+            </div>
+            `;
         }
 
         const hasValidation = (log.validation && Object.keys(log.validation).length > 0) || 
@@ -982,7 +1038,7 @@ class ApiSessionReportTool extends ToolBase {
             </div>
             <div class="log-body">
                 ${this.generateRequestResponseHtml(log)}
-                ${hasValidation ? this.generateValidationHtml(log.validation, log.bodyValidation) : ''}
+                ${hasValidation ? this.generateValidationHtml(log.validation, log.bodyValidation, log.expectations, log.response) : ''}
                 ${!hasValidation ? '<!-- No validation data available -->' : ''}
             </div>
         </div>
@@ -1000,12 +1056,26 @@ class ApiSessionReportTool extends ToolBase {
         return `
         <div class="chain-steps">
             <h4>Chain Steps (${steps.length})</h4>
-            ${steps.map((step, index) => `
-                <div class="chain-step">
-                    <h5>Step ${index + 1}</h5>
-                    ${this.generateRequestResponseHtml(step)}
-                </div>
-            `).join('')}
+            ${steps.map((step, index) => {
+                const hasStepValidation = (step.validation && Object.keys(step.validation).length > 0) || 
+                                         (step.bodyValidation && Object.keys(step.bodyValidation).length > 0);
+                return `
+                    <div class="chain-step">
+                        <h5>Step ${index + 1}: ${step.name || 'Unnamed'}</h5>
+                        ${this.generateRequestResponseHtml(step)}
+                        ${hasStepValidation ? this.generateValidationHtml(
+                            step.validation, 
+                            step.bodyValidation, 
+                            step.expectations,
+                            { 
+                                status: step.status, 
+                                contentType: step.contentType, 
+                                body: step.body 
+                            }
+                        ) : ''}
+                    </div>
+                `;
+            }).join('')}
         </div>
         `;
     }
@@ -1062,20 +1132,82 @@ class ApiSessionReportTool extends ToolBase {
     /**
      * Generate validation results HTML
      */
-    generateValidationHtml(validation, bodyValidation) {
+    generateValidationHtml(validation, bodyValidation, expectations, actualResponse) {
         // Handle undefined or empty validation objects
         validation = validation || {};
         bodyValidation = bodyValidation || {};
+        expectations = expectations || {};
         
         const isPassed = validation.status && validation.contentType && bodyValidation.matched;
 
         return `
         <div class="validation-results ${isPassed ? 'validation-passed' : 'validation-failed'}">
             <h4>Validation Results</h4>
-            <p><strong>Status Code:</strong> ${validation.status ? '✓ Passed' : '✗ Failed'}</p>
-            <p><strong>Content Type:</strong> ${validation.contentType ? '✓ Passed' : '✗ Failed'}</p>
-            <p><strong>Body Validation:</strong> ${bodyValidation.matched ? '✓ Passed' : '✗ Failed'}</p>
-            ${bodyValidation.reason ? `<p><strong>Reason:</strong> ${this.escapeHtml(bodyValidation.reason)}</p>` : ''}
+            
+            <!-- Status Code Validation -->
+            <div style="margin-bottom: 15px;">
+                <p><strong>Status Code:</strong> ${validation.status ? '✓ Passed' : '✗ Failed'}</p>
+                ${expectations.status !== undefined ? `
+                    <div class="validation-comparison">
+                        <div class="expected-section">
+                            <div class="comparison-title">Expected:</div>
+                            <div class="comparison-value">${expectations.status}</div>
+                        </div>
+                        <div class="actual-section">
+                            <div class="comparison-title">Actual:</div>
+                            <div class="comparison-value">${actualResponse?.status || 'N/A'}</div>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Content Type Validation -->
+            <div style="margin-bottom: 15px;">
+                <p><strong>Content Type:</strong> ${validation.contentType ? '✓ Passed' : '✗ Failed'}</p>
+                ${expectations.contentType !== undefined ? `
+                    <div class="validation-comparison">
+                        <div class="expected-section">
+                            <div class="comparison-title">Expected:</div>
+                            <div class="comparison-value">${this.escapeHtml(expectations.contentType)}</div>
+                        </div>
+                        <div class="actual-section">
+                            <div class="comparison-title">Actual:</div>
+                            <div class="comparison-value">${this.escapeHtml(actualResponse?.contentType || 'N/A')}</div>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
+
+            <!-- Body Validation -->
+            <div style="margin-bottom: 15px;">
+                <p><strong>Body Validation:</strong> ${bodyValidation.matched ? '✓ Passed' : '✗ Failed'}</p>
+                ${bodyValidation.reason ? `<p><strong>Reason:</strong> ${this.escapeHtml(bodyValidation.reason)}</p>` : ''}
+                
+                ${(expectations.body !== undefined || expectations.bodyRegex !== undefined) ? `
+                    <div class="validation-comparison">
+                        <div class="expected-section">
+                            <div class="comparison-title">Expected:</div>
+                            <div class="comparison-value">${
+                                expectations.bodyRegex 
+                                    ? `Regex: ${this.escapeHtml(expectations.bodyRegex)}`
+                                    : this.escapeHtml(typeof expectations.body === 'object' 
+                                        ? JSON.stringify(expectations.body, null, 2) 
+                                        : String(expectations.body || ''))
+                            }</div>
+                        </div>
+                        <div class="actual-section">
+                            <div class="comparison-title">Actual:</div>
+                            <div class="comparison-value">${
+                                actualResponse?.body !== undefined
+                                    ? this.escapeHtml(typeof actualResponse.body === 'object' 
+                                        ? JSON.stringify(actualResponse.body, null, 2) 
+                                        : String(actualResponse.body))
+                                    : 'N/A'
+                            }</div>
+                        </div>
+                    </div>
+                ` : ''}
+            </div>
         </div>
         `;
     }
