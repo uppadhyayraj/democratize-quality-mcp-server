@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * MCP Server Startup Script
+ * Democratize Quality MCP Server Startup Script
  * Provides easy configuration and startup options
  */
 
@@ -18,7 +18,7 @@ const options = {
 
 if (options.help) {
     console.log(`
-🚀 CDP Browser Control MCP Server
+🎯 Democratize Quality MCP Server
 
 Usage: npm run server [options]
    or: node run-server.js [options]
@@ -38,7 +38,7 @@ Integration Examples:
 1. Claude Desktop (add to claude_desktop_config.json):
 {
   "mcpServers": {
-    "cdp-browser-control": {
+    "democratize-quality": {
       "command": "node",
       "args": ["${path.join(__dirname, 'mcpServer.js')}"]
     }
@@ -55,7 +55,7 @@ Available Tools: 20 total
 - Browser Tools (17): automation, interaction, content capture
 - API Tools (3): HTTP testing, session management, reporting
 
-Repository: https://github.com/your-username/cdp-browser-control
+Repository: https://github.com/democratize-quality/mcp-server
 `);
     process.exit(0);
 }

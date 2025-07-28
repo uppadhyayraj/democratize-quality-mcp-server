@@ -1,6 +1,6 @@
 # Documentation Index
 
-Welcome to the MCP Browser Control Server documentation!
+Welcome to the Democratize Quality MCP Server documentation!
 
 ## 📚 Table of Contents
 

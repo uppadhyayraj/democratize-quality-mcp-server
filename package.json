@@ -1,15 +1,18 @@
 {
-  "name": "@cdp-browser-control/mcp-server",
+  "name": "@democratize-quality/mcp-server",
   "version": "1.0.0",
   "main": "mcpServer.js",
   "bin": {
-    "cdp-browser-control": "./cli.js",
-    "cdp-mcp": "./cli.js"
+    "democratize-quality-mcp": "cli.js",
+    "dq-mcp-server": "cli.js"
   },
   "files": [
     "mcpServer.js",
     "run-server.js",
+    "cli.js",
+    "browserControl.js",
     "src/",
+    "docs/",
     "README.md",
     "LICENSE"
   ],
@@ -30,17 +33,31 @@
     "server:prod": "node run-server.js --production",
     "inspector": "npx @modelcontextprotocol/inspector node mcpServer.js",
     "prepare-publish": "node prepare-publish.js",
-    "prepublishOnly": "npm run prepare-publish"
+    "prepublishOnly": "npm run prepare-publish",
+    "postinstall": "echo '\n🎯 Democratize Quality MCP Server installed successfully!\n\nQuick start:\n  npx @democratize-quality/mcp-server --help\n  npx dq-mcp-server --help\n\nDocumentation: https://github.com/democratize-quality/mcp-server#readme\n'"
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "browser-automation",
     "api-testing",
-    "chrome-devtools"
+    "quality-assurance",
+    "testing",
+    "democratize-quality",
+    "chrome-devtools",
+    "end-to-end-testing"
   ],
-  "author": "",
+  "author": "Democratize Quality Team",
   "license": "ISC",
-  "description": "MCP Server for browser automation and API testing with Chrome DevTools Protocol",
+  "description": "MCP Server for democratizing quality through browser automation and comprehensive API testing capabilities",
+  "homepage": "https://github.com/democratize-quality/mcp-server#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/democratize-quality/mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/democratize-quality/mcp-server/issues"
+  },
   "mcp": {
     "server": {
       "command": "node",

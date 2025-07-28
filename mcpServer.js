@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// mcpServer.js - The new JSON-RPC 2.0 MCP Server entry point
+// mcpServer.js - Democratize Quality MCP Server entry point
 //
 // Debug/Logging Modes:
 // - Production mode (default): NODE_ENV=production or npm start - Minimal logging
@@ -29,13 +29,13 @@ let toolDefinitions = [];
 // Helper function for debug logging
 function debugLog(...args) {
     if (isDebugMode) {
-        console.error('[MCP Server]', ...args);
+        console.error('[Democratize Quality MCP]', ...args);
     }
 }
 
 // Helper function for important logs (always shown)
 function log(...args) {
-    console.error('[MCP Server]', ...args);
+    console.error('[Democratize Quality MCP]', ...args);
 }
 
 // Initialize the tool system

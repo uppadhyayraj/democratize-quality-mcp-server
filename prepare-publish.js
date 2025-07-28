@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-console.log('📦 Preparing CDP Browser Control MCP Server for publishing...\n');
+console.log('📦 Preparing Democratize Quality MCP Server for publishing...\n');
 
 // 1. Verify all required files exist
 const requiredFiles = [
@@ -86,7 +86,7 @@ console.log('');
 console.log('📖 After publishing, users can run:');
 console.log(`   npx ${packageJson.name}`);
 console.log('   npm install -g ' + packageJson.name);
-console.log('   cdp-browser-control --help');
+console.log('   democratize-quality-mcp --help');
 console.log('');
 console.log('🔗 Integration examples:');
 console.log('');
@@ -94,7 +94,7 @@ console.log('Claude Desktop config:');
 console.log('```json');
 console.log('{');
 console.log('  "mcpServers": {');
-console.log('    "cdp-browser-control": {');
+console.log('    "democratize-quality": {');
 console.log('      "command": "npx",');
 console.log(`      "args": ["${packageJson.name}"]`);
 console.log('    }');

@@ -579,7 +579,7 @@ class ApiRequestTool extends ToolBase {
                 path: url.pathname + url.search,
                 method: method.toUpperCase(),
                 headers: {
-                    'User-Agent': 'CDP-Browser-Control/1.0',
+                    'User-Agent': 'Democratize-Quality-MCP/1.0',
                     ...headers
                 },
                 timeout

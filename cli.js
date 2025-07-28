@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * CDP Browser Control MCP Server CLI
- * Can be run via npx @cdp-browser-control/mcp-server
+ * Democratize Quality MCP Server CLI
+ * Can be run via npx @democratize-quality/mcp-server
  */
 
 const { spawn } = require('child_process');
@@ -17,20 +17,20 @@ const isVersion = args.includes('--version') || args.includes('-v');
 
 if (isVersion) {
     const packageJson = require('./package.json');
-    console.log(`CDP Browser Control MCP Server v${packageJson.version}`);
+    console.log(`Democratize Quality MCP Server v${packageJson.version}`);
     process.exit(0);
 }
 
 if (isHelp) {
     console.log(`
-🚀 CDP Browser Control MCP Server
+🎯 Democratize Quality MCP Server
 
-A comprehensive MCP server for browser automation and API testing.
+A comprehensive MCP server for democratizing quality through browser automation and API testing.
 
 Usage:
-  npx @cdp-browser-control/mcp-server [options]
-  cdp-browser-control [options]
-  cdp-mcp [options]
+  npx @democratize-quality/mcp-server [options]
+  democratize-quality-mcp [options]
+  dq-mcp-server [options]
 
 Options:
   --help, -h                Show this help
@@ -58,9 +58,9 @@ Add this to ~/Library/Application Support/Claude/claude_desktop_config.json
 
 {
   "mcpServers": {
-    "cdp-browser-control": {
+    "democratize-quality": {
       "command": "npx",
-      "args": ["@cdp-browser-control/mcp-server"]
+      "args": ["@democratize-quality/mcp-server"]
     }
   }
 }
@@ -68,8 +68,8 @@ Add this to ~/Library/Application Support/Claude/claude_desktop_config.json
 Or if installed globally:
 {
   "mcpServers": {
-    "cdp-browser-control": {
-      "command": "cdp-browser-control"
+    "democratize-quality": {
+      "command": "democratize-quality-mcp"
     }
   }
 }
@@ -78,7 +78,7 @@ Available Tools: 20
 • Browser Automation (17): launch, navigate, click, type, screenshot, pdf, etc.
 • API Testing (3): request, session status, HTML reports
 
-GitHub: https://github.com/your-username/cdp-browser-control
+GitHub: https://github.com/democratize-quality/mcp-server
 `);
     process.exit(0);
 }

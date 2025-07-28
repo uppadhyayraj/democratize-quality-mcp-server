@@ -1,0 +1,59 @@
+# Development and Testing
+node_modules/
+*.log
+npm-debug.log*
+.nyc_output
+coverage/
+tests/
+test-mcp.js
+
+# Build outputs and cache
+output/
+.cache/
+dist/
+build/
+
+# Chrome test profiles and browser data
+my_test_profile/
+chrome_debug_profile/
+*.chrome
+chrome-err.log
+chrome-out.log
+chrome.pid
+
+# IDE and Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git and version control
+.git/
+.gitignore
+
+# Documentation source (we include built docs)
+scripts/
+PUBLISHING.md
+
+# Development utilities
+prepare-publish.js
+
+# Environment and config
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup

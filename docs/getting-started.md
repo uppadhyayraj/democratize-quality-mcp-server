@@ -1,6 +1,6 @@
 # Getting Started
 
-Quick start guide for the MCP Browser Control Server.
+Quick start guide for the Democratize Quality MCP Server.
 
 ---
 
@@ -15,8 +15,8 @@ Quick start guide for the MCP Browser Control Server.
 ### Clone and Setup
 
 ```bash
-git clone <repository-url>
-cd cdp-browser-control
+git clone https://github.com/democratize-quality/mcp-server.git
+cd mcp-server
 npm install
 ```
 

@@ -4,7 +4,7 @@
  */
 module.exports = {
     server: {
-        name: 'browser-control-server',
+        name: 'democratize-quality-mcp-server',
         version: '1.0.0',
         protocolVersion: '2024-11-05',
         port: process.env.PORT || 3000

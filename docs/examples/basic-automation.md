@@ -1,6 +1,6 @@
 # Basic Browser Automation
 
-This example demonstrates basic browser automation tasks.
+This example demonstrates basic browser automation tasks using the Democratize Quality MCP Server.
 
 ## Complete Workflow
 
