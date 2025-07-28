@@ -35,10 +35,13 @@ Thumbs.db
 # Git and version control
 .git/
 .gitignore
+.github/
 
 # Documentation source (we include built docs)
 scripts/
 PUBLISHING.md
+PUBLISHING-CHECKLIST.md
+READY-TO-PUBLISH.md
 
 # Development utilities
 prepare-publish.js

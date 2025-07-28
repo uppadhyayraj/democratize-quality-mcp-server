@@ -1,0 +1,115 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      prerelease:
+        description: 'Is this a prerelease?'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Run pre-publish checks
+        run: npm run prepare-publish
+        
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+      - name: Bump version
+        id: version
+        run: |
+          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+            NEW_VERSION=$(npm version pre${{ github.event.inputs.release_type }} --no-git-tag-version)
+          else
+            NEW_VERSION=$(npm version ${{ github.event.inputs.release_type }} --no-git-tag-version)
+          fi
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version_number=${NEW_VERSION#v}" >> $GITHUB_OUTPUT
+          
+      - name: Update README version references
+        run: |
+          VERSION="${{ steps.version.outputs.version_number }}"
+          sed -i "s/@democratize-quality\/mcp-server@[0-9]*\.[0-9]*\.[0-9]*/@democratize-quality\/mcp-server@$VERSION/g" README.md
+          
+      - name: Commit version bump
+        run: |
+          git add package.json package-lock.json README.md
+          git commit -m "chore: bump version to ${{ steps.version.outputs.new_version }}"
+          git tag ${{ steps.version.outputs.new_version }}
+          
+      - name: Push changes
+        run: |
+          git push origin main
+          git push origin ${{ steps.version.outputs.new_version }}
+          
+      - name: Generate changelog
+        id: changelog
+        run: |
+          echo "## What's Changed" > CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+          if [ -n "$LAST_TAG" ]; then
+            git log $LAST_TAG..HEAD --pretty=format:"* %s" --no-merges >> CHANGELOG.md
+          else
+            echo "* Initial release of @democratize-quality/mcp-server" >> CHANGELOG.md
+            echo "* 3 powerful API testing tools with enhanced validation" >> CHANGELOG.md
+            echo "* Session management and request chaining capabilities" >> CHANGELOG.md
+            echo "* Interactive HTML reports with expected vs actual comparisons" >> CHANGELOG.md
+          fi
+          
+          echo "" >> CHANGELOG.md
+          echo "## Installation" >> CHANGELOG.md
+          echo "" >> CHANGELOG.md
+          echo "\`\`\`bash" >> CHANGELOG.md
+          echo "npx @democratize-quality/mcp-server --help" >> CHANGELOG.md
+          echo "npm install -g @democratize-quality/mcp-server" >> CHANGELOG.md
+          echo "\`\`\`" >> CHANGELOG.md
+          
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.version.outputs.new_version }}
+          release_name: ${{ steps.version.outputs.new_version }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease }}

@@ -1,0 +1,72 @@
+name: Publish to NPM
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (leave empty for current package.json version)'
+        required: false
+        default: ''
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          registry-url: 'https://registry.npmjs.org'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Run pre-publish checks
+        run: npm run prepare-publish
+        
+      - name: Update version if specified
+        if: github.event.inputs.version != ''
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+        
+      - name: Publish to NPM
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          
+      - name: Create release summary
+        run: |
+          echo "## 🎉 Package Published Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Package:** \`@democratize-quality/mcp-server\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** \`$(node -p "require('./package.json').version")\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Installation" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npx @democratize-quality/mcp-server --help" >> $GITHUB_STEP_SUMMARY
+          echo "npm install -g @democratize-quality/mcp-server" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Claude Desktop Integration" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`json" >> $GITHUB_STEP_SUMMARY
+          echo '{' >> $GITHUB_STEP_SUMMARY
+          echo '  "mcpServers": {' >> $GITHUB_STEP_SUMMARY
+          echo '    "democratize-quality": {' >> $GITHUB_STEP_SUMMARY
+          echo '      "command": "npx",' >> $GITHUB_STEP_SUMMARY
+          echo '      "args": ["@democratize-quality/mcp-server"]' >> $GITHUB_STEP_SUMMARY
+          echo '    }' >> $GITHUB_STEP_SUMMARY
+          echo '  }' >> $GITHUB_STEP_SUMMARY
+          echo '}' >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

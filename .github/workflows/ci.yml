@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16, 18, 20]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests
+        run: npm test
+        
+      - name: Run prepare-publish (validation)
+        run: npm run prepare-publish
+        
+      - name: Test CLI commands
+        run: |
+          ./cli.js --version
+          ./cli.js --help
+          
+      - name: Test MCP server startup
+        run: |
+          timeout 10s node mcpServer.js || [ $? -eq 124 ]
+          
+      - name: Validate package.json
+        run: npm pkg fix --dry-run
