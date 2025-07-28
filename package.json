@@ -47,16 +47,16 @@
     "chrome-devtools",
     "end-to-end-testing"
   ],
-  "author": "Democratize Quality Team",
+  "author": "Raj Uppadhyay",
   "license": "ISC",
   "description": "MCP Server for democratizing quality through browser automation and comprehensive API testing capabilities",
-  "homepage": "https://github.com/democratize-quality/mcp-server#readme",
+  "homepage": "https://github.com/uppadhyayraj/democratize-quality-mcp-server#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/democratize-quality/mcp-server.git"
+    "url": "git+https://github.com/uppadhyayraj/democratize-quality-mcp-server.git"
   },
   "bugs": {
-    "url": "https://github.com/democratize-quality/mcp-server/issues"
+    "url": "https://github.com/uppadhyayraj/democratize-quality-mcp-server/issues"
   },
   "mcp": {
     "server": {
