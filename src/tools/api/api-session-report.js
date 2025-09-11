@@ -79,11 +79,27 @@ class ApiSessionReportTool extends ToolBase {
         }
         this.sessionStore = global.__API_SESSION_STORE__;
 
-        // Use output directory from environment or default to user home directory
-        const defaultOutputDir = process.env.HOME
-            ? path.join(process.env.HOME, '.mcp-browser-control')
-            : path.join(os.tmpdir(), 'mcp-browser-control');
+        // Try to use reports directory in current working directory first
+        let defaultOutputDir;
+        try {
+            defaultOutputDir = path.join(process.cwd(), 'reports');
+        } catch (error) {
+            // Fallback to existing logic if current working directory is not accessible
+            defaultOutputDir = process.env.HOME
+                ? path.join(process.env.HOME, '.mcp-browser-control')
+                : path.join(os.tmpdir(), 'mcp-browser-control');
+        }
+        
         this.outputDir = process.env.OUTPUT_DIR || defaultOutputDir;
+        
+        // Ensure output directory exists
+        try {
+            if (!fs.existsSync(this.outputDir)) {
+                fs.mkdirSync(this.outputDir, { recursive: true });
+            }
+        } catch (error) {
+            console.warn(`Warning: Could not create output directory ${this.outputDir}:`, error.message);
+        }
     }
 
     async execute(parameters) {

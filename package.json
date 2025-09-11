@@ -1,6 +1,6 @@
 {
   "name": "@democratize-quality/mcp-server",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "main": "mcpServer.js",
   "bin": {
     "democratize-quality-mcp": "cli.js",
